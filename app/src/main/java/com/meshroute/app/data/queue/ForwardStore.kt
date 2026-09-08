@@ -23,6 +23,7 @@ class ForwardStore(
     val queuedPacketsFlow: Flow<List<QueuedPacketEntity>> = packetDao.observeAll()
     val pendingCountFlow: Flow<Int> = packetDao.observePendingCount()
     val totalCountFlow: Flow<Int> = packetDao.observeTotalCount()
+    val uploadedCountFlow: Flow<Int> = packetDao.observeUploadedCount()
 
     /**
      * Persist an incoming packet to disk immediately as QUEUED.
@@ -57,9 +58,21 @@ class ForwardStore(
         Log.d(TAG, "Updated packet $packetId status to DELIVERED")
     }
 
+    /** Mark a packet as successfully uploaded to backend by gateway */
+    suspend fun markUploaded(packetId: String) = withContext(Dispatchers.IO) {
+        packetDao.updateStatus(packetId, PacketPersistenceStatus.UPLOADED.name)
+        Log.i(TAG, "GATEWAY: Marked packet $packetId as UPLOADED")
+    }
+
     /** Retrieve all pending packets that need forwarding (e.g. on restart or reconnect) */
     suspend fun getPendingUnsentPackets(): List<SosPacket> = withContext(Dispatchers.IO) {
         val entities = packetDao.getPendingQueuedPackets()
+        return@withContext entities.map { it.toSosPacket() }
+    }
+
+    /** Retrieve all packets queued or relayed that have not yet been uploaded to backend */
+    suspend fun getPendingUploadPackets(): List<SosPacket> = withContext(Dispatchers.IO) {
+        val entities = packetDao.getPendingUploadPackets()
         return@withContext entities.map { it.toSosPacket() }
     }
 

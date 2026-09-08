@@ -31,6 +31,12 @@ interface PacketDao {
     @Query("SELECT COUNT(*) FROM queued_packets")
     fun observeTotalCount(): Flow<Int>
 
+    @Query("SELECT * FROM queued_packets WHERE status != 'UPLOADED' AND status != 'EXPIRED' ORDER BY timestamp ASC")
+    suspend fun getPendingUploadPackets(): List<QueuedPacketEntity>
+
+    @Query("SELECT COUNT(*) FROM queued_packets WHERE status = 'UPLOADED'")
+    fun observeUploadedCount(): Flow<Int>
+
     @Query("UPDATE queued_packets SET status = :newStatus WHERE packetId = :packetId")
     suspend fun updateStatus(packetId: String, newStatus: String)
 

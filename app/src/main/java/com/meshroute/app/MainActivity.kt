@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import com.meshroute.app.data.database.AppDatabase
 import com.meshroute.app.data.database.entity.QueuedPacketEntity
 import com.meshroute.app.data.queue.ForwardStore
+import com.meshroute.app.gateway.AndroidNetworkMonitor
+import com.meshroute.app.gateway.GatewayUploader
+import com.meshroute.app.gateway.NetworkMonitor
 import com.meshroute.app.location.AndroidGpsLocationProvider
 import com.meshroute.app.location.LocationProvider
 import com.meshroute.app.mesh.ble.BleMeshTransport
@@ -52,6 +55,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var seenSet: SeenSet
     private lateinit var router: MeshRouter
     private lateinit var locationProvider: LocationProvider
+    private lateinit var networkMonitor: NetworkMonitor
+    private lateinit var gatewayUploader: GatewayUploader
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +67,8 @@ class MainActivity : ComponentActivity() {
         transport = BleMeshTransport(applicationContext, selfNodeId)
         router = MeshRouter(selfNodeId, transport, forwardStore, seenSet)
         locationProvider = AndroidGpsLocationProvider(applicationContext)
+        networkMonitor = AndroidNetworkMonitor(applicationContext)
+        gatewayUploader = GatewayUploader(forwardStore, networkMonitor)
 
         setContent {
             MaterialTheme(
@@ -82,7 +89,9 @@ class MainActivity : ComponentActivity() {
                         transport = transport,
                         router = router,
                         forwardStore = forwardStore,
-                        locationProvider = locationProvider
+                        locationProvider = locationProvider,
+                        gatewayUploader = gatewayUploader,
+                        networkMonitor = networkMonitor
                     )
                 }
             }
@@ -92,6 +101,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         router.stop()
+        gatewayUploader.stop()
     }
 }
 
@@ -102,17 +112,22 @@ fun MeshRouteSosScreen(
     transport: BleMeshTransport,
     router: MeshRouter,
     forwardStore: ForwardStore,
-    locationProvider: LocationProvider
+    locationProvider: LocationProvider,
+    gatewayUploader: GatewayUploader,
+    networkMonitor: NetworkMonitor
 ) {
     val coroutineScope = rememberCoroutineScope()
     val neighbors by transport.neighbors.collectAsState()
     val health by transport.health.collectAsState()
+    val isInternetAvailable by networkMonitor.isInternetAvailable.collectAsState()
+    val uploadedCount by forwardStore.uploadedCountFlow.collectAsState(initial = 0)
 
     val receivedPackets = remember { mutableStateListOf<SosPacket>() }
     val relayEvents = remember { mutableStateListOf<RelayEvent>() }
     val duplicateEvents = remember { mutableStateListOf<DuplicateSuppressedEvent>() }
     val ttlEvents = remember { mutableStateListOf<TtlExhaustedEvent>() }
     val expiredEvents = remember { mutableStateListOf<PacketExpiredEvent>() }
+    val gatewayEvents = remember { mutableStateListOf<com.meshroute.app.gateway.GatewayUploadEvent>() }
 
     val storedPackets by forwardStore.queuedPacketsFlow.collectAsState(initial = emptyList())
     val pendingCount by forwardStore.pendingCountFlow.collectAsState(initial = 0)
@@ -124,7 +139,10 @@ fun MeshRouteSosScreen(
     var selectedTtl by remember { mutableIntStateOf(8) } // default 8 hops
     var currentLocation by remember { mutableStateOf<LocationData?>(null) }
     var isFetchingLocation by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Delivered SOS, 1: TTL & Expiry, 2: Suppressed, 3: Room DB, 4: Relay, 5: Peers
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Delivered SOS, 1: Pipeline, 2: Gateway Uploads, 3: TTL, 4: Suppressed, 5: Room DB, 6: Relay, 7: Peers
+
+    var backendUrlInput by remember { mutableStateOf(gatewayUploader.backendUrl) }
+    var showBackendConfig by remember { mutableStateOf(false) }
 
     val requiredPermissions = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -152,6 +170,7 @@ fun MeshRouteSosScreen(
             coroutineScope.launch {
                 transport.start()
                 router.start()
+                gatewayUploader.start()
                 isRunning = true
                 currentLocation = locationProvider.getLastKnownLocation()
             }
@@ -163,7 +182,10 @@ fun MeshRouteSosScreen(
     }
 
     LaunchedEffect(Unit) {
-        router.deliveredPackets.collect { packet -> receivedPackets.add(0, packet) }
+        router.deliveredPackets.collect { packet ->
+            receivedPackets.add(0, packet)
+            gatewayUploader.triggerUpload()
+        }
     }
     LaunchedEffect(Unit) {
         router.relayEvents.collect { event -> relayEvents.add(0, event) }
@@ -177,6 +199,9 @@ fun MeshRouteSosScreen(
     LaunchedEffect(Unit) {
         router.expiredEvents.collect { event -> expiredEvents.add(0, event) }
     }
+    LaunchedEffect(Unit) {
+        gatewayUploader.uploadEvents.collect { event -> gatewayEvents.add(0, event) }
+    }
 
     Scaffold(
         topBar = {
@@ -186,21 +211,38 @@ fun MeshRouteSosScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("MeshRoute", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                color = Color(0xFFEF4444).copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    "Phase 7: Real SOS Packet",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFEF4444),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
+                            if (isInternetAvailable) {
+                                Surface(
+                                    color = Color(0xFF10B981).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.CloudDone, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(11.dp))
+                                        Text("GATEWAY ONLINE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                    }
+                                }
+                            } else {
+                                Surface(
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.CloudOff, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(11.dp))
+                                        Text("RELAY (OFFLINE)", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                                    }
+                                }
                             }
                         }
                         Text(
-                            "Node: $selfNodeId • AES-256 Encrypted • GPS Active",
+                            "Node: $selfNodeId • AES-256-GCM • Hop Limit & Auto-Gateway",
                             fontSize = 11.sp,
                             color = Color.LightGray,
                             fontFamily = FontFamily.Monospace
@@ -261,6 +303,13 @@ fun MeshRouteSosScreen(
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
+                    title = "Uploaded",
+                    count = uploadedCount,
+                    icon = Icons.Default.CloudUpload,
+                    color = Color(0xFF34D399),
+                    modifier = Modifier.weight(1f)
+                )
+                MetricCard(
                     title = "Suppressed",
                     count = router.suppressedCount.get(),
                     icon = Icons.Default.FilterAlt,
@@ -268,12 +317,66 @@ fun MeshRouteSosScreen(
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
-                    title = "TTL Stopped",
+                    title = "Stopped",
                     count = router.ttlExhaustedCount.get(),
                     icon = Icons.Default.Block,
                     color = Color(0xFFF59E0B),
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Backend Gateway Target Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(
+                                Icons.Default.Dns,
+                                contentDescription = null,
+                                tint = if (isInternetAvailable) Color(0xFF10B981) else Color.Gray,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Column {
+                                Text("Gateway Backend Endpoint", fontSize = 10.sp, color = Color.Gray)
+                                Text(gatewayUploader.backendUrl, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.White)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(onClick = { showBackendConfig = !showBackendConfig }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Settings, contentDescription = "Config URL", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                            }
+                            FilledTonalButton(
+                                onClick = { coroutineScope.launch { gatewayUploader.drainQueue() } },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                enabled = isInternetAvailable
+                            ) {
+                                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Drain", fontSize = 10.sp)
+                            }
+                        }
+                    }
+                    if (showBackendConfig) {
+                        OutlinedTextField(
+                            value = backendUrlInput,
+                            onValueChange = {
+                                backendUrlInput = it
+                                gatewayUploader.backendUrl = it
+                            },
+                            label = { Text("Server URL (e.g. http://192.168.1.5:3000)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
             }
 
             // Real SOS Origination Card (GPS Capture + AES Encryption)
@@ -416,6 +519,7 @@ fun MeshRouteSosScreen(
                                     medicalInfo = medicalNotes,
                                     ttl = selectedTtl
                                 )
+                                gatewayUploader.triggerUpload()
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -438,11 +542,21 @@ fun MeshRouteSosScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Delivered SOS (${receivedPackets.size})", fontSize = 11.sp) }
+                    text = { Text("Delivered (${receivedPackets.size})", fontSize = 11.sp) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
+                    text = { Text("Delivery Flow", fontSize = 11.sp, color = Color(0xFF38BDF8)) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Gateway (${gatewayEvents.size})", fontSize = 11.sp, color = Color(0xFF10B981)) }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
                     text = {
                         val count = ttlEvents.size + expiredEvents.size
                         Text(
@@ -453,23 +567,23 @@ fun MeshRouteSosScreen(
                     }
                 )
                 Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("Suppressed (${duplicateEvents.size})", fontSize = 11.sp) }
-                )
-                Tab(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    text = { Text("Room DB (${storedPackets.size})", fontSize = 11.sp) }
-                )
-                Tab(
                     selected = selectedTab == 4,
                     onClick = { selectedTab = 4 },
-                    text = { Text("Relay (${relayEvents.size})", fontSize = 11.sp) }
+                    text = { Text("Suppressed (${duplicateEvents.size})", fontSize = 11.sp) }
                 )
                 Tab(
                     selected = selectedTab == 5,
                     onClick = { selectedTab = 5 },
+                    text = { Text("Room DB (${storedPackets.size})", fontSize = 11.sp) }
+                )
+                Tab(
+                    selected = selectedTab == 6,
+                    onClick = { selectedTab = 6 },
+                    text = { Text("Relay (${relayEvents.size})", fontSize = 11.sp) }
+                )
+                Tab(
+                    selected = selectedTab == 7,
+                    onClick = { selectedTab = 7 },
                     text = { Text("Peers (${neighbors.size})", fontSize = 11.sp) }
                 )
             }
@@ -477,16 +591,18 @@ fun MeshRouteSosScreen(
             // Tab Content
             when (selectedTab) {
                 0 -> DeliveredSosList(receivedPackets, selfNodeId)
-                1 -> TtlBoundedList(ttlEvents, expiredEvents)
-                2 -> SuppressedDuplicatesList(duplicateEvents)
-                3 -> RoomStorageList(storedPackets, onClear = {
+                1 -> DeliveryFlowView(receivedPackets, isInternetAvailable, uploadedCount)
+                2 -> GatewayUploadsList(gatewayEvents)
+                3 -> TtlBoundedList(ttlEvents, expiredEvents)
+                4 -> SuppressedDuplicatesList(duplicateEvents)
+                5 -> RoomStorageList(storedPackets, onClear = {
                     coroutineScope.launch {
                         forwardStore.clearDatabase()
                         router.seenSet.clear()
                     }
                 })
-                4 -> RelayActivityList(relayEvents, selfNodeId)
-                5 -> NeighborsList(neighbors)
+                6 -> RelayActivityList(relayEvents, selfNodeId)
+                7 -> NeighborsList(neighbors)
             }
         }
     }
@@ -516,13 +632,7 @@ fun DeliveredSosList(
         ) {
             items(packets) { packet ->
                 val isMaxHops = packet.hops >= packet.ttl
-                // Attempt local decryption using emergency key to display authorized preview
-                val decryptedPayload = remember(packet.payload) {
-                    runCatching {
-                        val json = CryptoManager.decryptString(packet.payload, KeyManager.defaultEmergencyKey)
-                        EmergencyPayload.fromJson(json)
-                    }.getOrNull()
-                }
+                var isDecryptedRevealed by remember(packet.messageId) { mutableStateOf(false) }
 
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
@@ -571,25 +681,48 @@ fun DeliveredSosList(
                             )
                         }
 
-                        // Decrypted Payload or Ciphertext preview
-                        if (decryptedPayload != null) {
+                        // Payload View: Confidential Ciphertext by default, with Authorized Decrypt Action
+                        if (isDecryptedRevealed) {
+                            val decryptedPayload = remember(packet.payload) {
+                                runCatching {
+                                    val json = CryptoManager.decryptString(packet.payload, KeyManager.defaultEmergencyKey)
+                                    EmergencyPayload.fromJson(json)
+                                }.getOrNull()
+                            }
+
                             Surface(
                                 color = Color(0xFF0F172A),
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Icon(Icons.Default.LockOpen, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(12.dp))
-                                        Text("Decrypted Emergency Content:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Icon(Icons.Default.LockOpen, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(12.dp))
+                                            Text("Decrypted Emergency Content:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                        }
+                                        TextButton(
+                                            onClick = { isDecryptedRevealed = false },
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                        ) {
+                                            Text("Hide", fontSize = 10.sp, color = Color.LightGray)
+                                        }
                                     }
-                                    Text("\"${decryptedPayload.message}\"", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                                    if (decryptedPayload.senderName.isNotEmpty() || decryptedPayload.medicalInfo.isNotEmpty()) {
-                                        Text(
-                                            "From: ${decryptedPayload.senderName}  •  Notes: ${decryptedPayload.medicalInfo}",
-                                            fontSize = 10.sp,
-                                            color = Color.LightGray
-                                        )
+                                    if (decryptedPayload != null) {
+                                        Text("\"${decryptedPayload.message}\"", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                                        if (decryptedPayload.senderName.isNotEmpty() || decryptedPayload.medicalInfo.isNotEmpty()) {
+                                            Text(
+                                                "From: ${decryptedPayload.senderName}  •  Notes: ${decryptedPayload.medicalInfo}",
+                                                fontSize = 10.sp,
+                                                color = Color.LightGray
+                                            )
+                                        }
+                                    } else {
+                                        Text("Failed to decrypt payload with key", fontSize = 11.sp, color = Color(0xFFEF4444))
                                     }
                                 }
                             }
@@ -599,12 +732,31 @@ fun DeliveredSosList(
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(8.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
-                                        Text("Encrypted Ciphertext (Relay Mode):", fontSize = 10.sp, color = Color(0xFFF59E0B))
+                                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
+                                            Text("Encrypted Ciphertext (Relay Mode):", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                                        }
+                                        TextButton(
+                                            onClick = { isDecryptedRevealed = true },
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                        ) {
+                                            Icon(Icons.Default.Key, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(11.dp))
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text("Decrypt", fontSize = 10.sp, color = Color(0xFF10B981))
+                                        }
                                     }
-                                    Text(packet.payload.take(48) + "...", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.Gray)
+                                    Text(
+                                        packet.payload.take(54) + "...",
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color.Gray
+                                    )
                                 }
                             }
                         }

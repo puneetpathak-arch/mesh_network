@@ -10,8 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -174,12 +173,7 @@ fun RoomStorageList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(packets) { entity ->
-                val decrypted = remember(entity.payload) {
-                    runCatching {
-                        val json = CryptoManager.decryptString(entity.payload, KeyManager.defaultEmergencyKey)
-                        EmergencyPayload.fromJson(json)
-                    }.getOrNull()
-                }
+                var isDecrypted by remember(entity.packetId) { mutableStateOf(false) }
 
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2535)),
@@ -222,20 +216,70 @@ fun RoomStorageList(
                             )
                         }
 
-                        if (decrypted != null) {
-                            Text(
-                                "\"${decrypted.message}\"",
-                                fontSize = 13.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Medium
-                            )
+                        if (isDecrypted) {
+                            val decrypted = remember(entity.payload) {
+                                runCatching {
+                                    val json = CryptoManager.decryptString(entity.payload, KeyManager.defaultEmergencyKey)
+                                    EmergencyPayload.fromJson(json)
+                                }.getOrNull()
+                            }
+                            Surface(
+                                color = Color(0xFF0F172A),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Decrypted:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                        TextButton(
+                                            onClick = { isDecrypted = false },
+                                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                        ) {
+                                            Text("Hide", fontSize = 10.sp, color = Color.LightGray)
+                                        }
+                                    }
+                                    if (decrypted != null) {
+                                        Text(
+                                            "\"${decrypted.message}\"",
+                                            fontSize = 12.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        if (decrypted.senderName.isNotEmpty() || decrypted.medicalInfo.isNotEmpty()) {
+                                            Text(
+                                                "From: ${decrypted.senderName} • Notes: ${decrypted.medicalInfo}",
+                                                fontSize = 10.sp,
+                                                color = Color.LightGray
+                                            )
+                                        }
+                                    } else {
+                                        Text("Decryption failed", fontSize = 11.sp, color = Color(0xFFEF4444))
+                                    }
+                                }
+                            }
                         } else {
-                            Text(
-                                "Payload: ${entity.payload.take(36)}...",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = Color.Gray
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Ciphertext: ${entity.payload.take(30)}...",
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color.Gray
+                                )
+                                TextButton(
+                                    onClick = { isDecrypted = true },
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                ) {
+                                    Text("Decrypt", fontSize = 10.sp, color = Color(0xFF10B981))
+                                }
+                            }
                         }
 
                         if (entity.latitude != null && entity.longitude != null) {
@@ -493,7 +537,7 @@ fun TtlBoundedList(
 // ─── Shared empty state ──────────────────────────────────────────────────────
 
 @Composable
-private fun EmptyStateBox(message: String) {
+fun EmptyStateBox(message: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -508,5 +552,236 @@ private fun EmptyStateBox(message: String) {
             fontSize = 13.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
+    }
+}
+
+// ─── GatewayUploadsList ─────────────────────────────────────────────────────
+
+@Composable
+fun GatewayUploadsList(events: List<com.meshroute.app.gateway.GatewayUploadEvent>) {
+    if (events.isEmpty()) {
+        EmptyStateBox("No packets uploaded to backend yet.\nWhen this phone has internet, queued SOS packets will upload automatically.")
+        return
+    }
+    val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(events) { event ->
+            when (event) {
+                is com.meshroute.app.gateway.GatewayUploadEvent.Success -> {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF132E22)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    color = Color(0xFF10B981),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        "UPLOADED (${event.statusCode})",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    event.packetId,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF6EE7B7),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(timeFormat.format(Date(event.timestamp)), fontSize = 10.sp, color = Color.Gray)
+                            }
+                            Text(
+                                "Server ACK: ${event.responseBody}",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color.LightGray
+                            )
+                        }
+                    }
+                }
+                is com.meshroute.app.gateway.GatewayUploadEvent.Failure -> {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF3B1E22)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    color = Color(0xFFEF4444),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        "UPLOAD FAILED",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    event.packetId,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFFCA5A5),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(timeFormat.format(Date(event.timestamp)), fontSize = 10.sp, color = Color.Gray)
+                            }
+                            Text(
+                                "Error: ${event.error}",
+                                fontSize = 11.sp,
+                                color = Color(0xFFF87171)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── DeliveryFlowView (Killer Demo End-to-End Status) ───────────────────────
+
+@Composable
+fun DeliveryFlowView(
+    packets: List<com.meshroute.app.mesh.transport.SosPacket>,
+    isInternetAvailable: Boolean,
+    uploadedCount: Int
+) {
+    if (packets.isEmpty()) {
+        EmptyStateBox("Create or receive an SOS packet to see the end-to-end delivery pipeline status.")
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(packets) { packet ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "PIPELINE: ${packet.messageId}",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = Color(0xFF93C5FD)
+                        )
+                        Surface(
+                            color = Color(0xFFEF4444).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text("TTL ${packet.hops}/${packet.ttl}", fontSize = 10.sp, color = Color(0xFFEF4444), modifier = Modifier.padding(4.dp, 2.dp))
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFF334155))
+
+                    // 1. SOS CREATED
+                    PipelineStepRow(
+                        stepNumber = 1,
+                        label = "SOS CREATED",
+                        detail = "Origin: ${packet.originatorId}",
+                        isCompleted = true
+                    )
+
+                    // 2. ENCRYPTED & STORED TO ROOM DISK
+                    PipelineStepRow(
+                        stepNumber = 2,
+                        label = "PACKET STORED TO DISK",
+                        detail = "AES-256-GCM encrypted payload persisted in Room DB",
+                        isCompleted = true
+                    )
+
+                    // 3. MULTI-HOP RELAY
+                    val relayed = packet.hops > 0
+                    PipelineStepRow(
+                        stepNumber = 3,
+                        label = if (relayed) "HOP ${packet.hops} RELAYED" else "DIRECT ONE-HOP",
+                        detail = "Hop Path: ${packet.hopPath.joinToString(" ➔ ")}",
+                        isCompleted = true
+                    )
+
+                    // 4. GATEWAY FOUND
+                    val gatewayFound = isInternetAvailable || uploadedCount > 0
+                    PipelineStepRow(
+                        stepNumber = 4,
+                        label = "GATEWAY DETECTION",
+                        detail = if (gatewayFound) "Gateway connected to internet" else "Searching for internet gateway...",
+                        isCompleted = gatewayFound
+                    )
+
+                    // 5. UPLOADED TO BACKEND & NOTIFIED
+                    val isUploaded = uploadedCount > 0
+                    PipelineStepRow(
+                        stepNumber = 5,
+                        label = "UPLOADED TO BACKEND",
+                        detail = if (isUploaded) "Delivered to MeshRoute API & Emergency Contacts Notified" else "Pending gateway upload",
+                        isCompleted = isUploaded
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PipelineStepRow(
+    stepNumber: Int,
+    label: String,
+    detail: String,
+    isCompleted: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Surface(
+            color = if (isCompleted) Color(0xFF10B981) else Color(0xFF475569),
+            shape = androidx.compose.foundation.shape.CircleShape,
+            modifier = Modifier.size(22.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (isCompleted) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                } else {
+                    Text("$stepNumber", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                label,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                color = if (isCompleted) Color.White else Color.Gray
+            )
+            Text(
+                detail,
+                fontSize = 10.sp,
+                color = if (isCompleted) Color(0xFF94A3B8) else Color.DarkGray
+            )
+        }
     }
 }

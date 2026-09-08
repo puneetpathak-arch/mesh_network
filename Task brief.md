@@ -39,12 +39,13 @@ Reference repos (study patterns, don't fork-merge blindly):
 > **Fill this in and keep it updated — this is the single most important
 > section for the agent.**
 
-- **Current phase:** 6 (TTL / hop limit)
-- **Phases 1–5 status:** done (manual device testing on physical phones)
-- **Testing mode:** manual only, on Android Studio + physical phones (no
-  automated/unit tests being written)
-- **Devices available for testing:** _(fill in — e.g. "4 phones: A, B, C, D")_
-- **Known issues / open bugs:** _(fill in)_
+- **Current phase:** Phases 8–10 (Gateway upload, backend API, and delivery UI implemented in code; pending multi-device hardware test run by user)
+- **Phases 1–5 status:** done (confirmed via manual device testing on physical phones)
+- **Phases 6–7 status:** code & unit test implementation complete (AES-256-GCM encryption, GPS capture, TTL bounds, ciphertext-only relays); pending physical hardware run by user
+- **Phases 8–10 status:** code & test implementation complete (Android Gateway uploader with ConnectivityManager, Node.js backend API passing all 5 test layers, delivery flow UI added); pending physical hardware run by user
+- **Testing mode:** Android Studio + physical phones (user will execute manual multi-device tests after completion of phases); Node.js backend automated test suite passing
+- **Devices available for testing:** Physical phones via Android Studio
+- **Known issues / open bugs:** Gradle wrapper distribution download timeout when executing `./gradlew.bat test` directly from terminal without pre-cached Gradle (use Android Studio to build APK or run with pre-cached Gradle distribution)
 
 ---
 

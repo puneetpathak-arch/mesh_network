@@ -39,10 +39,15 @@ fun createMockForwardStore(): ForwardStore {
         override suspend fun getById(packetId: String): QueuedPacketEntity? = stored.find { it.packetId == packetId }
         override suspend fun getByStatus(status: String): List<QueuedPacketEntity> = stored.filter { it.status == status }
         override suspend fun getPendingQueuedPackets(): List<QueuedPacketEntity> = stored.filter { it.status == "QUEUED" }
+        override suspend fun getPendingUploadPackets(): List<QueuedPacketEntity> = stored.filter { it.status != "UPLOADED" && it.status != "EXPIRED" }
         override fun observeAll() = kotlinx.coroutines.flow.flowOf(stored)
         override fun observePendingCount() = kotlinx.coroutines.flow.flowOf(stored.count { it.status == "QUEUED" })
         override fun observeTotalCount() = kotlinx.coroutines.flow.flowOf(stored.size)
-        override suspend fun updateStatus(packetId: String, newStatus: String) {}
+        override fun observeUploadedCount() = kotlinx.coroutines.flow.flowOf(stored.count { it.status == "UPLOADED" })
+        override suspend fun updateStatus(packetId: String, newStatus: String) {
+            val idx = stored.indexOfFirst { it.packetId == packetId }
+            if (idx >= 0) stored[idx] = stored[idx].copy(status = newStatus)
+        }
         override suspend fun delete(packetId: String) { stored.removeIf { it.packetId == packetId } }
         override suspend fun clearAll() { stored.clear() }
     }
