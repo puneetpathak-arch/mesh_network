@@ -25,11 +25,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.meshroute.app.data.database.AppDatabase
 import com.meshroute.app.data.database.entity.QueuedPacketEntity
 import com.meshroute.app.data.queue.ForwardStore
@@ -164,6 +166,8 @@ fun MeshRouteSosScreen(
         }
     }
 
+    val context = LocalContext.current
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
@@ -179,7 +183,18 @@ fun MeshRouteSosScreen(
     }
 
     LaunchedEffect(Unit) {
-        permissionLauncher.launch(requiredPermissions)
+        val hasAll = requiredPermissions.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (hasAll) {
+            transport.start()
+            router.start()
+            gatewayUploader.start()
+            isRunning = true
+            currentLocation = locationProvider.getLastKnownLocation()
+        } else {
+            permissionLauncher.launch(requiredPermissions)
+        }
     }
 
     LaunchedEffect(Unit) {

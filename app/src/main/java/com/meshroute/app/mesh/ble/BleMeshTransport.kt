@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
+import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
 import com.meshroute.app.mesh.transport.*
@@ -230,20 +231,26 @@ class BleMeshTransport(
         }
 
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setConnectable(true)
             .setTimeout(0)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .build()
 
-        val data = AdvertiseData.Builder()
+        // 1. Primary Advertise Data (under 31 bytes)
+        val advertiseData = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
             .addServiceUuid(ParcelUuid(BleConstants.SERVICE_UUID))
+            .build()
+
+        // 2. Scan Response Data (contains Node ID in Service Data, fits in 31-byte scan response)
+        val scanResponseData = AdvertiseData.Builder()
+            .setIncludeDeviceName(false)
             .addServiceData(ParcelUuid(BleConstants.SERVICE_UUID), selfNodeId.encodeToByteArray())
             .build()
 
-        advertiser?.startAdvertising(settings, data, advertiseCallback)
+        advertiser?.startAdvertising(settings, advertiseData, scanResponseData, advertiseCallback)
     }
 
     private fun stopAdvertising() {
@@ -263,7 +270,8 @@ class BleMeshTransport(
             .build()
 
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setReportDelay(0)
             .build()
 
         scanner?.startScan(listOf(filter), settings, scanCallback)
@@ -329,12 +337,17 @@ class BleMeshTransport(
         }
 
         var gattClient: BluetoothGatt? = null
+        var serviceDiscoveryStarted = false
 
         val gattCallback = object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.d(TAG, "GATT Client connected to ${peer.nodeId}, requesting MTU...")
-                    gatt.requestMtu(BleConstants.MAX_MTU)
+                    val mtuOk = gatt.requestMtu(BleConstants.MAX_MTU)
+                    if (!mtuOk && !serviceDiscoveryStarted) {
+                        serviceDiscoveryStarted = true
+                        gatt.discoverServices()
+                    }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     gatt.close()
                     if (continuation.isActive) {
@@ -345,7 +358,10 @@ class BleMeshTransport(
 
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                 Log.d(TAG, "GATT MTU set to $mtu, discovering services...")
-                gatt.discoverServices()
+                if (!serviceDiscoveryStarted) {
+                    serviceDiscoveryStarted = true
+                    gatt.discoverServices()
+                }
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
@@ -354,10 +370,23 @@ class BleMeshTransport(
                     val writeChar = service?.getCharacteristic(BleConstants.CHAR_PACKET_WRITE_UUID)
 
                     if (writeChar != null) {
-                        writeChar.value = data
-                        writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                        val initiated = gatt.writeCharacteristic(writeChar)
-                        if (!initiated) {
+                        val writeSuccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val writeResult = gatt.writeCharacteristic(
+                                writeChar,
+                                data,
+                                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                            )
+                            writeResult == BluetoothStatusCodes.SUCCESS
+                        } else {
+                            @Suppress("DEPRECATION")
+                            writeChar.value = data
+                            @Suppress("DEPRECATION")
+                            writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                            @Suppress("DEPRECATION")
+                            gatt.writeCharacteristic(writeChar)
+                        }
+
+                        if (!writeSuccess) {
                             Log.e(TAG, "Failed to initiate writeCharacteristic to ${peer.nodeId}")
                             gatt.disconnect()
                         }
