@@ -1,7 +1,8 @@
 package com.meshroute.app.mesh.router
 
 import com.meshroute.app.mesh.transport.InboundPacket
-import com.meshroute.app.mesh.transport.TestPacket
+import com.meshroute.app.mesh.transport.LocationData
+import com.meshroute.app.mesh.transport.SosPacket
 import com.meshroute.app.mesh.transport.TransportType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -18,9 +19,9 @@ class TtlAndExpiryTest {
         val transportB = FakeTransport()
         val transportC = FakeTransport()
 
-        val routerA = MeshRouter("MR-NODE-A", transportA, MockForwardStore(), SeenSet())
-        val routerB = MeshRouter("MR-NODE-B", transportB, MockForwardStore(), SeenSet())
-        val routerC = MeshRouter("MR-NODE-C", transportC, MockForwardStore(), SeenSet())
+        val routerA = MeshRouter("MR-NODE-A", transportA, createMockForwardStore(), SeenSet())
+        val routerB = MeshRouter("MR-NODE-B", transportB, createMockForwardStore(), SeenSet())
+        val routerC = MeshRouter("MR-NODE-C", transportC, createMockForwardStore(), SeenSet())
 
         routerA.start()
         routerB.start()
@@ -40,21 +41,24 @@ class TtlAndExpiryTest {
             }
         }
 
-        val collectedAtB = mutableListOf<TestPacket>()
-        val collectedAtC = mutableListOf<TestPacket>()
+        val collectedAtB = mutableListOf<SosPacket>()
+        val collectedAtC = mutableListOf<SosPacket>()
 
         val jobB = launch { routerB.deliveredPackets.collect { collectedAtB.add(it) } }
         val jobC = launch { routerC.deliveredPackets.collect { collectedAtC.add(it) } }
 
+        val gps = LocationData(latitude = 36.1069, longitude = -112.1129, accuracy = 4.0f)
+
         // Node A originates with TTL = 1
-        routerA.originate(message = "Single-Hop Restricted SOS", ttl = 1)
+        routerA.originateSos(message = "Single-Hop Restricted SOS", location = gps, ttl = 1)
 
         delay(100L)
 
         // 1. Node B received and delivered locally
         assertEquals(1, collectedAtB.size)
-        assertEquals(1, collectedAtB[0].hops)
+        assertEquals(0, collectedAtB[0].hops)
         assertEquals(1, collectedAtB[0].ttl)
+        assertEquals(gps, collectedAtB[0].location)
 
         // 2. Node B recognized TTL limit reached and HALTED relay
         assertEquals(1, routerB.ttlExhaustedCount.get())
@@ -79,10 +83,10 @@ class TtlAndExpiryTest {
         val transportC = FakeTransport()
         val transportD = FakeTransport()
 
-        val routerA = MeshRouter("MR-NODE-A", transportA, MockForwardStore(), SeenSet())
-        val routerB = MeshRouter("MR-NODE-B", transportB, MockForwardStore(), SeenSet())
-        val routerC = MeshRouter("MR-NODE-C", transportC, MockForwardStore(), SeenSet())
-        val routerD = MeshRouter("MR-NODE-D", transportD, MockForwardStore(), SeenSet())
+        val routerA = MeshRouter("MR-NODE-A", transportA, createMockForwardStore(), SeenSet())
+        val routerB = MeshRouter("MR-NODE-B", transportB, createMockForwardStore(), SeenSet())
+        val routerC = MeshRouter("MR-NODE-C", transportC, createMockForwardStore(), SeenSet())
+        val routerD = MeshRouter("MR-NODE-D", transportD, createMockForwardStore(), SeenSet())
 
         routerA.start()
         routerB.start()
@@ -99,23 +103,23 @@ class TtlAndExpiryTest {
             runBlocking { transportD.inboundFlow.emit(InboundPacket(data, "MR-NODE-C", TransportType.LOOPBACK)) }
         }
 
-        val collectedAtC = mutableListOf<TestPacket>()
-        val collectedAtD = mutableListOf<TestPacket>()
+        val collectedAtC = mutableListOf<SosPacket>()
+        val collectedAtD = mutableListOf<SosPacket>()
 
         val jobC = launch { routerC.deliveredPackets.collect { collectedAtC.add(it) } }
         val jobD = launch { routerD.deliveredPackets.collect { collectedAtD.add(it) } }
 
         // Node A originates with TTL = 2
-        routerA.originate(message = "Two-Hop Restricted SOS", ttl = 2)
+        routerA.originateSos(message = "Two-Hop Restricted SOS", ttl = 2)
 
         delay(100L)
 
-        // Node B relayed to Node C (hops: 1 -> 2)
+        // Node B relayed to Node C (hops: 0 -> 1)
         assertEquals(1, routerB.relayedCount.get())
 
-        // Node C delivered locally (hops: 2 / 2)
+        // Node C delivered locally (hops: 1, ttl: 2)
         assertEquals(1, collectedAtC.size)
-        assertEquals(2, collectedAtC[0].hops)
+        assertEquals(1, collectedAtC[0].hops)
         assertEquals(1, routerC.ttlExhaustedCount.get())
         assertEquals(0, routerC.relayedCount.get()) // C did NOT forward to D
 
@@ -136,8 +140,8 @@ class TtlAndExpiryTest {
         val transportA = FakeTransport()
         val transportB = FakeTransport()
 
-        val routerA = MeshRouter("MR-NODE-A", transportA, MockForwardStore(), SeenSet())
-        val routerB = MeshRouter("MR-NODE-B", transportB, MockForwardStore(), SeenSet())
+        val routerA = MeshRouter("MR-NODE-A", transportA, createMockForwardStore(), SeenSet())
+        val routerB = MeshRouter("MR-NODE-B", transportB, createMockForwardStore(), SeenSet())
 
         routerA.start()
         routerB.start()
@@ -146,11 +150,11 @@ class TtlAndExpiryTest {
             runBlocking { transportB.inboundFlow.emit(InboundPacket(data, "MR-NODE-A", TransportType.LOOPBACK)) }
         }
 
-        val collectedAtB = mutableListOf<TestPacket>()
+        val collectedAtB = mutableListOf<SosPacket>()
         val jobB = launch { routerB.deliveredPackets.collect { collectedAtB.add(it) } }
 
         // Originate packet with negative lifetime (already expired)
-        routerA.originate(message = "Stale Packet", ttl = 8, lifetimeMs = -5000L)
+        routerA.originateSos(message = "Stale SOS Packet", ttl = 8, lifetimeMs = -5000L)
 
         delay(100L)
 

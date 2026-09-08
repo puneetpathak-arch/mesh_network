@@ -1,0 +1,218 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.meshroute.app"
+4    android:versionCode="1"
+5    android:versionName="1.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="36" />
+10
+11    <!-- Location permissions (required for BLE scanning on Android < 12 and GPS capture) -->
+12    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+12-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:5:5-79
+12-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:5:22-76
+13    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+13-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:6:5-81
+13-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:6:22-78
+14
+15    <!-- Bluetooth permissions for Android 12+ -->
+16    <uses-permission
+16-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:9:5-11:58
+17        android:name="android.permission.BLUETOOTH_SCAN"
+17-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:10:9-57
+18        android:usesPermissionFlags="neverForLocation" />
+18-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:11:9-55
+19    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+19-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:12:5-78
+19-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:12:22-75
+20    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+20-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:13:5-76
+20-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:13:22-73
+21
+22    <!-- Legacy Bluetooth permissions for Android 11 and lower -->
+23    <uses-permission
+23-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:16:5-95
+24        android:name="android.permission.BLUETOOTH"
+24-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:16:22-65
+25        android:maxSdkVersion="30" />
+25-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:16:66-92
+26    <uses-permission
+26-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:17:5-101
+27        android:name="android.permission.BLUETOOTH_ADMIN"
+27-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:17:22-71
+28        android:maxSdkVersion="30" />
+28-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:17:72-98
+29
+30    <!-- Wi-Fi Direct and Network permissions -->
+31    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+31-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:20:5-76
+31-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:20:22-73
+32    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+32-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:21:5-76
+32-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:21:22-73
+33    <uses-permission android:name="android.permission.INTERNET" />
+33-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:22:5-67
+33-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:22:22-64
+34    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+34-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:23:5-79
+34-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:23:22-76
+35
+36    <!-- Foreground Service & Power Management -->
+37    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+37-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:26:5-77
+37-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:26:22-74
+38    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+38-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:27:5-94
+38-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:27:22-91
+39    <uses-permission android:name="android.permission.WAKE_LOCK" />
+39-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:28:5-68
+39-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:28:22-65
+40    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+40-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:29:5-77
+40-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:29:22-74
+41
+42    <!-- Hardware requirements -->
+43    <uses-feature
+43-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:32:5-90
+44        android:name="android.hardware.bluetooth_le"
+44-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:32:19-63
+45        android:required="true" />
+45-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:32:64-87
+46    <uses-feature
+46-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:33:5-91
+47        android:name="android.hardware.location.gps"
+47-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:33:19-63
+48        android:required="false" />
+48-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:33:64-88
+49
+50    <permission
+50-->[androidx.core:core:1.15.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/26a2c24b129f2ab9bad44cdc28f21b03/transformed/core-1.15.0/AndroidManifest.xml:22:5-24:47
+51        android:name="com.meshroute.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+51-->[androidx.core:core:1.15.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/26a2c24b129f2ab9bad44cdc28f21b03/transformed/core-1.15.0/AndroidManifest.xml:23:9-81
+52        android:protectionLevel="signature" />
+52-->[androidx.core:core:1.15.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/26a2c24b129f2ab9bad44cdc28f21b03/transformed/core-1.15.0/AndroidManifest.xml:24:9-44
+53
+54    <uses-permission android:name="com.meshroute.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+54-->[androidx.core:core:1.15.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/26a2c24b129f2ab9bad44cdc28f21b03/transformed/core-1.15.0/AndroidManifest.xml:26:5-97
+54-->[androidx.core:core:1.15.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/26a2c24b129f2ab9bad44cdc28f21b03/transformed/core-1.15.0/AndroidManifest.xml:26:22-94
+55
+56    <application
+56-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:35:5-54:19
+57        android:allowBackup="false"
+57-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:36:9-36
+58        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+58-->[androidx.core:core:1.15.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/26a2c24b129f2ab9bad44cdc28f21b03/transformed/core-1.15.0/AndroidManifest.xml:28:18-86
+59        android:dataExtractionRules="@xml/data_extraction_rules"
+59-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:37:9-65
+60        android:debuggable="true"
+61        android:extractNativeLibs="false"
+62        android:fullBackupContent="@xml/backup_rules"
+62-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:38:9-54
+63        android:icon="@mipmap/ic_launcher"
+63-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:39:9-43
+64        android:label="@string/app_name"
+64-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:40:9-41
+65        android:roundIcon="@mipmap/ic_launcher_round"
+65-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:41:9-54
+66        android:supportsRtl="true"
+66-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:42:9-35
+67        android:theme="@style/Theme.MeshRoute" >
+67-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:43:9-47
+68        <activity
+68-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:45:9-53:20
+69            android:name="com.meshroute.app.MainActivity"
+69-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:46:13-41
+70            android:exported="true"
+70-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:47:13-36
+71            android:theme="@style/Theme.MeshRoute" >
+71-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:48:13-51
+72            <intent-filter>
+72-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:49:13-52:29
+73                <action android:name="android.intent.action.MAIN" />
+73-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:50:17-69
+73-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:50:25-66
+74
+75                <category android:name="android.intent.category.LAUNCHER" />
+75-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:51:17-77
+75-->/home/puneetpathak/Documents/meshnetwork/app/src/main/AndroidManifest.xml:51:27-74
+76            </intent-filter>
+77        </activity>
+78
+79        <provider
+79-->[androidx.emoji2:emoji2:1.3.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/880e85716d827c40f41f2e8887426889/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+80            android:name="androidx.startup.InitializationProvider"
+80-->[androidx.emoji2:emoji2:1.3.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/880e85716d827c40f41f2e8887426889/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+81            android:authorities="com.meshroute.app.androidx-startup"
+81-->[androidx.emoji2:emoji2:1.3.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/880e85716d827c40f41f2e8887426889/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+82            android:exported="false" >
+82-->[androidx.emoji2:emoji2:1.3.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/880e85716d827c40f41f2e8887426889/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+83            <meta-data
+83-->[androidx.emoji2:emoji2:1.3.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/880e85716d827c40f41f2e8887426889/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+84                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+84-->[androidx.emoji2:emoji2:1.3.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/880e85716d827c40f41f2e8887426889/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+85                android:value="androidx.startup" />
+85-->[androidx.emoji2:emoji2:1.3.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/880e85716d827c40f41f2e8887426889/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+86            <meta-data
+86-->[androidx.lifecycle:lifecycle-process:2.8.7] /home/puneetpathak/.gradle/caches/9.3.1/transforms/9f88a9ed1cf40347c5699d8537ceaef8/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:29:13-31:52
+87                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+87-->[androidx.lifecycle:lifecycle-process:2.8.7] /home/puneetpathak/.gradle/caches/9.3.1/transforms/9f88a9ed1cf40347c5699d8537ceaef8/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:30:17-78
+88                android:value="androidx.startup" />
+88-->[androidx.lifecycle:lifecycle-process:2.8.7] /home/puneetpathak/.gradle/caches/9.3.1/transforms/9f88a9ed1cf40347c5699d8537ceaef8/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:31:17-49
+89            <meta-data
+89-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
+90                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+90-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
+91                android:value="androidx.startup" />
+91-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
+92        </provider>
+93
+94        <service
+94-->[androidx.room:room-runtime:2.6.1] /home/puneetpathak/.gradle/caches/9.3.1/transforms/50fcf67f68f83223096fbb44af3c4e64/transformed/room-runtime-2.6.1/AndroidManifest.xml:24:9-28:63
+95            android:name="androidx.room.MultiInstanceInvalidationService"
+95-->[androidx.room:room-runtime:2.6.1] /home/puneetpathak/.gradle/caches/9.3.1/transforms/50fcf67f68f83223096fbb44af3c4e64/transformed/room-runtime-2.6.1/AndroidManifest.xml:25:13-74
+96            android:directBootAware="true"
+96-->[androidx.room:room-runtime:2.6.1] /home/puneetpathak/.gradle/caches/9.3.1/transforms/50fcf67f68f83223096fbb44af3c4e64/transformed/room-runtime-2.6.1/AndroidManifest.xml:26:13-43
+97            android:exported="false" />
+97-->[androidx.room:room-runtime:2.6.1] /home/puneetpathak/.gradle/caches/9.3.1/transforms/50fcf67f68f83223096fbb44af3c4e64/transformed/room-runtime-2.6.1/AndroidManifest.xml:27:13-37
+98
+99        <receiver
+99-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
+100            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+100-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
+101            android:directBootAware="false"
+101-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
+102            android:enabled="true"
+102-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
+103            android:exported="true"
+103-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
+104            android:permission="android.permission.DUMP" >
+104-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
+105            <intent-filter>
+105-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
+106                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+106-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
+106-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
+107            </intent-filter>
+108            <intent-filter>
+108-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
+109                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+109-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
+109-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
+110            </intent-filter>
+111            <intent-filter>
+111-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
+112                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+112-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
+112-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
+113            </intent-filter>
+114            <intent-filter>
+114-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
+115                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+115-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
+115-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/puneetpathak/.gradle/caches/9.3.1/transforms/bdfe05be69950ac7beb189d31e5244c3/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
+116            </intent-filter>
+117        </receiver>
+118    </application>
+119
+120</manifest>

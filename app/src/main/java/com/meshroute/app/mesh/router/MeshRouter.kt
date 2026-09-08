@@ -1,14 +1,18 @@
 package com.meshroute.app.mesh.router
 
 import android.util.Log
-import com.meshroute.app.data.database.entity.PacketPersistenceStatus
 import com.meshroute.app.data.queue.ForwardStore
+import com.meshroute.app.mesh.transport.LocationData
 import com.meshroute.app.mesh.transport.MeshTransport
-import com.meshroute.app.mesh.transport.TestPacket
+import com.meshroute.app.mesh.transport.SosPacket
+import com.meshroute.app.security.CryptoManager
+import com.meshroute.app.security.EmergencyPayload
+import com.meshroute.app.security.KeyManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
+import javax.crypto.SecretKey
 
 data class RelayEvent(
     val packetId: String,
@@ -57,19 +61,19 @@ class MeshRouter(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val _deliveredPackets = MutableSharedFlow<TestPacket>(extraBufferCapacity = 128)
-    val deliveredPackets: Flow<TestPacket> = _deliveredPackets.asSharedFlow()
+    private val _deliveredPackets = MutableSharedFlow<SosPacket>(replay = 16, extraBufferCapacity = 128)
+    val deliveredPackets: Flow<SosPacket> = _deliveredPackets.asSharedFlow()
 
-    private val _relayEvents = MutableSharedFlow<RelayEvent>(extraBufferCapacity = 128)
+    private val _relayEvents = MutableSharedFlow<RelayEvent>(replay = 16, extraBufferCapacity = 128)
     val relayEvents: Flow<RelayEvent> = _relayEvents.asSharedFlow()
 
-    private val _suppressedEvents = MutableSharedFlow<DuplicateSuppressedEvent>(extraBufferCapacity = 128)
+    private val _suppressedEvents = MutableSharedFlow<DuplicateSuppressedEvent>(replay = 16, extraBufferCapacity = 128)
     val suppressedEvents: Flow<DuplicateSuppressedEvent> = _suppressedEvents.asSharedFlow()
 
-    private val _ttlExhaustedEvents = MutableSharedFlow<TtlExhaustedEvent>(extraBufferCapacity = 128)
+    private val _ttlExhaustedEvents = MutableSharedFlow<TtlExhaustedEvent>(replay = 16, extraBufferCapacity = 128)
     val ttlExhaustedEvents: Flow<TtlExhaustedEvent> = _ttlExhaustedEvents.asSharedFlow()
 
-    private val _expiredEvents = MutableSharedFlow<PacketExpiredEvent>(extraBufferCapacity = 128)
+    private val _expiredEvents = MutableSharedFlow<PacketExpiredEvent>(replay = 16, extraBufferCapacity = 128)
     val expiredEvents: Flow<PacketExpiredEvent> = _expiredEvents.asSharedFlow()
 
     val originatedCount = AtomicInteger(0)
@@ -108,7 +112,7 @@ class MeshRouter(
             drainPendingQueue()
         }
 
-        Log.i(TAG, "MeshRouter started on node: $selfNodeId (TTL & Expiration bounding active)")
+        Log.i(TAG, "MeshRouter started on node: $selfNodeId (SOS Encryption & GPS support active)")
     }
 
     fun stop() {
@@ -120,20 +124,46 @@ class MeshRouter(
         Log.i(TAG, "MeshRouter stopped on node: $selfNodeId")
     }
 
-    /** Originate a brand new packet from this node with configurable TTL & lifetime */
-    suspend fun originate(
+    /**
+     * Originate a real SOS emergency packet with GPS location and AES-256-GCM encrypted payload.
+     * The emergency payload is encrypted before touching local persistence or the transport layer.
+     */
+    suspend fun originateSos(
         message: String,
+        location: LocationData? = null,
+        senderName: String = "User",
+        medicalInfo: String = "",
+        batteryPercent: Int = -1,
         targetId: String? = null,
-        ttl: Int = TestPacket.DEFAULT_TTL,
-        lifetimeMs: Long = TestPacket.DEFAULT_LIFETIME_MS
-    ): TestPacket = withContext(Dispatchers.IO) {
+        ttl: Int = SosPacket.DEFAULT_TTL,
+        lifetimeMs: Long = SosPacket.DEFAULT_LIFETIME_MS,
+        encryptionKey: SecretKey = KeyManager.defaultEmergencyKey
+    ): SosPacket = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        val packet = TestPacket(
-            packetId = "PKT-" + UUID.randomUUID().toString().take(8).uppercase(),
+
+        // 1. Construct emergency payload structure
+        val emergencyPayload = EmergencyPayload(
+            message = message,
+            senderName = senderName,
+            medicalInfo = medicalInfo,
+            batteryPercent = batteryPercent,
+            timestamp = now
+        )
+
+        // 2. Encrypt payload with AES-256-GCM before transport
+        val encryptedCiphertextBase64 = CryptoManager.encryptString(
+            plaintext = emergencyPayload.toJson(),
+            key = encryptionKey
+        )
+
+        val packet = SosPacket(
+            messageId = "SOS-" + UUID.randomUUID().toString().take(8).uppercase(),
             senderId = selfNodeId,
             originatorId = selfNodeId,
             targetId = targetId,
-            message = message,
+            location = location,
+            priority = SosPacket.PRIORITY_SOS,
+            payload = encryptedCiphertextBase64,
             ttl = ttl,
             hops = 0,
             hopPath = listOf(selfNodeId),
@@ -141,33 +171,50 @@ class MeshRouter(
             expiresAt = now + lifetimeMs
         )
 
-        seenSet.add(packet.packetId)
+        seenSet.add(packet.messageId)
         originatedCount.incrementAndGet()
 
-        // 1. Persist to SQLite disk first
+        // 3. Persist encrypted packet to SQLite disk before transmission
         forwardStore.persistOutbound(packet)
 
-        Log.i(TAG, "Originating packet: ${packet.packetId} (TTL: ${packet.ttl}, Hops: 0, Expires in: ${lifetimeMs / 1000}s)")
+        Log.i(
+            TAG,
+            "Originating encrypted SOS packet: ${packet.messageId} (TTL: ${packet.ttl}, GPS: ${packet.location?.latitude ?: "N/A"}, ${packet.location?.longitude ?: "N/A"}, Payload bytes: ${encryptedCiphertextBase64.length})"
+        )
 
-        // 2. Attempt radio transmission
+        // 4. Transmit over radio transport
         val sent = transport.send(packet.toByteArray())
         if (sent) {
-            forwardStore.markRelayed(packet.packetId)
+            forwardStore.markRelayed(packet.messageId)
         }
 
         return@withContext packet
     }
 
+    /** Backward-compatible origination helper for test suites and standard broadcasts */
+    suspend fun originate(
+        message: String,
+        targetId: String? = null,
+        ttl: Int = SosPacket.DEFAULT_TTL,
+        lifetimeMs: Long = SosPacket.DEFAULT_LIFETIME_MS
+    ): SosPacket = originateSos(
+        message = message,
+        location = null,
+        targetId = targetId,
+        ttl = ttl,
+        lifetimeMs = lifetimeMs
+    )
+
     /** Process incoming packet bytes from direct transport */
     private suspend fun handleInbound(data: ByteArray) {
-        val packet = TestPacket.fromByteArray(data) ?: run {
+        val packet = SosPacket.fromByteArray(data) ?: run {
             Log.w(TAG, "Failed to decode inbound packet")
             return
         }
 
         // 1. Ignore self-originated echo
         if (packet.originatorId == selfNodeId) {
-            Log.d(TAG, "Ignoring self-originated packet echo: ${packet.packetId}")
+            Log.d(TAG, "Ignoring self-originated packet echo: ${packet.messageId}")
             return
         }
 
@@ -176,10 +223,10 @@ class MeshRouter(
             expiredCount.incrementAndGet()
             Log.w(
                 TAG,
-                "PACKET EXPIRED: ${packet.packetId} from ${packet.senderId} (created: ${packet.timestamp}, expired: ${packet.expiresAt})"
+                "PACKET EXPIRED: ${packet.messageId} from ${packet.senderId} (created: ${packet.timestamp}, expired: ${packet.expiresAt})"
             )
             val expEvent = PacketExpiredEvent(
-                packetId = packet.packetId,
+                packetId = packet.messageId,
                 originatorId = packet.originatorId,
                 createdTimestamp = packet.timestamp,
                 expiredTimestamp = packet.expiresAt
@@ -189,15 +236,15 @@ class MeshRouter(
         }
 
         // ─── GATE 2: Atomic Duplicate Check via SeenSet ───
-        val isFirstSighting = seenSet.add(packet.packetId)
+        val isFirstSighting = seenSet.add(packet.messageId)
         if (!isFirstSighting) {
             suppressedCount.incrementAndGet()
             Log.w(
                 TAG,
-                "DUPLICATE SUPPRESSED: ${packet.packetId} from ${packet.senderId} (Already seen!)"
+                "DUPLICATE SUPPRESSED: ${packet.messageId} from ${packet.senderId} (Already seen!)"
             )
             val dupEvent = DuplicateSuppressedEvent(
-                packetId = packet.packetId,
+                packetId = packet.messageId,
                 originatorId = packet.originatorId,
                 duplicateSenderId = packet.senderId,
                 hopPath = packet.hopPath
@@ -208,7 +255,7 @@ class MeshRouter(
 
         // ─── GATE 3: Loop Prevention ───
         if (packet.hopPath.contains(selfNodeId)) {
-            Log.d(TAG, "Dropping packet ${packet.packetId}: self $selfNodeId already in hop path ${packet.hopPath}")
+            Log.d(TAG, "Dropping packet ${packet.messageId}: self $selfNodeId already in hop path ${packet.hopPath}")
             return
         }
 
@@ -218,28 +265,27 @@ class MeshRouter(
         receivedCount.incrementAndGet()
         Log.i(
             TAG,
-            "Delivering packet ${packet.packetId} (Origin: ${packet.originatorId}, Hops: ${packet.hops}/${packet.ttl})"
+            "Delivering SOS packet ${packet.messageId} (Origin: ${packet.originatorId}, Hops: ${packet.hops}/${packet.ttl}, Priority: ${packet.priority})"
         )
 
-        // Deliver locally
+        // Deliver locally (payload remains encrypted for privacy)
         _deliveredPackets.emit(packet)
 
         // ─── GATE 4: Hop-Limit / TTL Check ───
-        if (packet.isHopLimitReached()) {
+        if (packet.hops + 1 >= packet.ttl) {
             ttlExhaustedCount.incrementAndGet()
             Log.w(
                 TAG,
-                "TTL EXHAUSTED: Packet ${packet.packetId} reached hop limit (${packet.hops}/${packet.ttl}). Halting propagation."
+                "TTL EXHAUSTED: Packet ${packet.messageId} reached hop limit (${packet.hops + 1}/${packet.ttl}). Halting propagation."
             )
             val ttlEvent = TtlExhaustedEvent(
-                packetId = packet.packetId,
+                packetId = packet.messageId,
                 originatorId = packet.originatorId,
-                currentHops = packet.hops,
+                currentHops = packet.hops + 1,
                 ttl = packet.ttl,
                 hopPath = packet.hopPath
             )
             _ttlExhaustedEvents.emit(ttlEvent)
-            // Stop relaying
             return
         }
 
@@ -248,7 +294,7 @@ class MeshRouter(
         relayedCount.incrementAndGet()
 
         val event = RelayEvent(
-            packetId = packet.packetId,
+            packetId = packet.messageId,
             originatorId = packet.originatorId,
             incomingHops = packet.hops,
             outgoingHops = relayed.hops,
@@ -259,13 +305,13 @@ class MeshRouter(
 
         Log.i(
             TAG,
-            "Relaying packet ${relayed.packetId}: Hop ${packet.hops} ➔ ${relayed.hops}/${packet.ttl} (Path: ${relayed.hopPath.joinToString(" ➔ ")})"
+            "Relaying encrypted SOS ${relayed.messageId}: Hop ${packet.hops} ➔ ${relayed.hops}/${packet.ttl} (Path: ${relayed.hopPath.joinToString(" ➔ ")})"
         )
 
         // Forward to reachable neighbors
         val sent = transport.send(relayed.toByteArray())
         if (sent) {
-            forwardStore.markRelayed(packet.packetId)
+            forwardStore.markRelayed(packet.messageId)
         }
     }
 
@@ -279,14 +325,13 @@ class MeshRouter(
         Log.i(TAG, "Found ${pending.size} pending packets in persistent storage across restart. Checking TTLs & dispatching...")
 
         for (packet in pending) {
-            // Check expiry before relaying from storage
             if (packet.isExpired()) {
-                Log.d(TAG, "Dropping stale packet ${packet.packetId} from disk queue (expired)")
+                Log.d(TAG, "Dropping stale packet ${packet.messageId} from disk queue (expired)")
                 continue
             }
 
             if (packet.isHopLimitReached()) {
-                Log.d(TAG, "Skipping relay for packet ${packet.packetId} (TTL reached: ${packet.hops}/${packet.ttl})")
+                Log.d(TAG, "Skipping relay for packet ${packet.messageId} (TTL reached: ${packet.hops}/${packet.ttl})")
                 continue
             }
 
@@ -299,8 +344,8 @@ class MeshRouter(
             val sent = transport.send(toForward.toByteArray())
             if (sent) {
                 restoredFromDiskCount.incrementAndGet()
-                forwardStore.markRelayed(packet.packetId)
-                Log.i(TAG, "Restored & successfully relayed packet ${packet.packetId} from persistent disk storage")
+                forwardStore.markRelayed(packet.messageId)
+                Log.i(TAG, "Restored & successfully relayed packet ${packet.messageId} from persistent disk storage")
             }
         }
     }

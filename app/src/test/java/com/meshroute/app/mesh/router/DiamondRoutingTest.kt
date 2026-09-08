@@ -1,33 +1,16 @@
 package com.meshroute.app.mesh.router
 
-import com.meshroute.app.data.database.entity.QueuedPacketEntity
-import com.meshroute.app.data.queue.ForwardStore
 import com.meshroute.app.mesh.transport.InboundPacket
-import com.meshroute.app.mesh.transport.TestPacket
+import com.meshroute.app.mesh.transport.LocationData
+import com.meshroute.app.mesh.transport.SosPacket
 import com.meshroute.app.mesh.transport.TransportType
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.toList
+import com.meshroute.app.security.CryptoManager
+import com.meshroute.app.security.EmergencyPayload
+import com.meshroute.app.security.KeyManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
-
-class MockForwardStore : ForwardStore(
-    packetDao = object : com.meshroute.app.data.database.dao.PacketDao {
-        val stored = mutableListOf<QueuedPacketEntity>()
-        override suspend fun insert(packet: QueuedPacketEntity) { stored.add(packet) }
-        override suspend fun insertAll(packets: List<QueuedPacketEntity>) { stored.addAll(packets) }
-        override suspend fun getById(packetId: String): QueuedPacketEntity? = stored.find { it.packetId == packetId }
-        override suspend fun getByStatus(status: String): List<QueuedPacketEntity> = stored.filter { it.status == status }
-        override suspend fun getPendingQueuedPackets(): List<QueuedPacketEntity> = stored.filter { it.status == "QUEUED" }
-        override fun observeAll() = kotlinx.coroutines.flow.flowOf(stored)
-        override fun observePendingCount() = kotlinx.coroutines.flow.flowOf(stored.count { it.status == "QUEUED" })
-        override fun observeTotalCount() = kotlinx.coroutines.flow.flowOf(stored.size)
-        override suspend fun updateStatus(packetId: String, newStatus: String) {}
-        override suspend fun delete(packetId: String) { stored.removeIf { it.packetId == packetId } }
-        override suspend fun clearAll() { stored.clear() }
-    }
-)
 
 class DiamondRoutingTest {
 
@@ -36,16 +19,16 @@ class DiamondRoutingTest {
         val seenSet = SeenSet(seenMessageDao = null)
 
         // First sighting
-        val isFirst = seenSet.add("PKT-100")
+        val isFirst = seenSet.add("SOS-100")
         assertTrue(isFirst)
-        assertTrue(seenSet.contains("PKT-100"))
+        assertTrue(seenSet.contains("SOS-100"))
 
         // Duplicate sighting
-        val isDuplicate = seenSet.add("PKT-100")
+        val isDuplicate = seenSet.add("SOS-100")
         assertFalse(isDuplicate)
 
         // Different packet
-        val isDifferent = seenSet.add("PKT-200")
+        val isDifferent = seenSet.add("SOS-200")
         assertTrue(isDifferent)
     }
 
@@ -57,10 +40,10 @@ class DiamondRoutingTest {
         val transportC = FakeTransport()
         val transportD = FakeTransport()
 
-        val routerA = MeshRouter("MR-NODE-A", transportA, MockForwardStore(), SeenSet())
-        val routerB = MeshRouter("MR-NODE-B", transportB, MockForwardStore(), SeenSet())
-        val routerC = MeshRouter("MR-NODE-C", transportC, MockForwardStore(), SeenSet())
-        val routerD = MeshRouter("MR-NODE-D", transportD, MockForwardStore(), SeenSet())
+        val routerA = MeshRouter("MR-NODE-A", transportA, createMockForwardStore(), SeenSet())
+        val routerB = MeshRouter("MR-NODE-B", transportB, createMockForwardStore(), SeenSet())
+        val routerC = MeshRouter("MR-NODE-C", transportC, createMockForwardStore(), SeenSet())
+        val routerD = MeshRouter("MR-NODE-D", transportD, createMockForwardStore(), SeenSet())
 
         routerA.start()
         routerB.start()
@@ -90,15 +73,22 @@ class DiamondRoutingTest {
             }
         }
 
-        val collectedPacketsAtD = mutableListOf<TestPacket>()
+        val collectedPacketsAtD = mutableListOf<SosPacket>()
         val job = launch {
             routerD.deliveredPackets.collect {
                 collectedPacketsAtD.add(it)
             }
         }
 
-        // 1. Node A originates a single packet
-        val packetA = routerA.originate("Diamond Multi-Path SOS Broadcast")
+        val gpsLocation = LocationData(latitude = 27.9881, longitude = 86.9250, accuracy = 5.0f) // Everest Base Camp
+
+        // 1. Node A originates a single SOS packet with GPS and AES encryption
+        val packetA = routerA.originateSos(
+            message = "Diamond Multi-Path SOS Broadcast",
+            location = gpsLocation,
+            senderName = "Expedition Team",
+            ttl = 8
+        )
 
         // Allow coroutine dispatches to complete
         kotlinx.coroutines.delay(100L)
@@ -106,8 +96,15 @@ class DiamondRoutingTest {
         // 2. Node D should have received both copies from B and C
         // but DELIVERED EXACTLY ONCE
         assertEquals(1, collectedPacketsAtD.size)
-        assertEquals(packetA.packetId, collectedPacketsAtD[0].packetId)
-        assertEquals("MR-NODE-A", collectedPacketsAtD[0].originatorId)
+        val delivered = collectedPacketsAtD[0]
+        assertEquals(packetA.messageId, delivered.messageId)
+        assertEquals("MR-NODE-A", delivered.originatorId)
+        assertEquals(gpsLocation, delivered.location)
+
+        // Decrypt payload at destination
+        val decrypted = CryptoManager.decryptString(delivered.payload, KeyManager.defaultEmergencyKey)
+        val payloadObj = EmergencyPayload.fromJson(decrypted)
+        assertEquals("Diamond Multi-Path SOS Broadcast", payloadObj?.message)
 
         // 3. Node D stats: 1 delivered, 1 suppressed
         assertEquals(1, routerD.receivedCount.get())

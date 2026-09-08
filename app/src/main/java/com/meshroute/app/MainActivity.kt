@@ -2,6 +2,7 @@ package com.meshroute.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,14 +10,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,9 +32,14 @@ import androidx.compose.ui.unit.sp
 import com.meshroute.app.data.database.AppDatabase
 import com.meshroute.app.data.database.entity.QueuedPacketEntity
 import com.meshroute.app.data.queue.ForwardStore
+import com.meshroute.app.location.AndroidGpsLocationProvider
+import com.meshroute.app.location.LocationProvider
 import com.meshroute.app.mesh.ble.BleMeshTransport
 import com.meshroute.app.mesh.router.*
 import com.meshroute.app.mesh.transport.*
+import com.meshroute.app.security.CryptoManager
+import com.meshroute.app.security.EmergencyPayload
+import com.meshroute.app.security.KeyManager
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -45,6 +51,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var forwardStore: ForwardStore
     private lateinit var seenSet: SeenSet
     private lateinit var router: MeshRouter
+    private lateinit var locationProvider: LocationProvider
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +61,7 @@ class MainActivity : ComponentActivity() {
         seenSet = SeenSet(database.seenMessageDao())
         transport = BleMeshTransport(applicationContext, selfNodeId)
         router = MeshRouter(selfNodeId, transport, forwardStore, seenSet)
+        locationProvider = AndroidGpsLocationProvider(applicationContext)
 
         setContent {
             MaterialTheme(
@@ -69,11 +77,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MeshRouteTtlScreen(
+                    MeshRouteSosScreen(
                         selfNodeId = selfNodeId,
                         transport = transport,
                         router = router,
-                        forwardStore = forwardStore
+                        forwardStore = forwardStore,
+                        locationProvider = locationProvider
                     )
                 }
             }
@@ -88,17 +97,18 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MeshRouteTtlScreen(
+fun MeshRouteSosScreen(
     selfNodeId: String,
     transport: BleMeshTransport,
     router: MeshRouter,
-    forwardStore: ForwardStore
+    forwardStore: ForwardStore,
+    locationProvider: LocationProvider
 ) {
     val coroutineScope = rememberCoroutineScope()
     val neighbors by transport.neighbors.collectAsState()
     val health by transport.health.collectAsState()
 
-    val receivedPackets = remember { mutableStateListOf<TestPacket>() }
+    val receivedPackets = remember { mutableStateListOf<SosPacket>() }
     val relayEvents = remember { mutableStateListOf<RelayEvent>() }
     val duplicateEvents = remember { mutableStateListOf<DuplicateSuppressedEvent>() }
     val ttlEvents = remember { mutableStateListOf<TtlExhaustedEvent>() }
@@ -108,10 +118,13 @@ fun MeshRouteTtlScreen(
     val pendingCount by forwardStore.pendingCountFlow.collectAsState(initial = 0)
 
     var isRunning by remember { mutableStateOf(false) }
-    var packetCounter by remember { mutableIntStateOf(1) }
-    var testMessageText by remember { mutableStateOf("Emergency Signal Delta") }
-    var selectedTtl by remember { mutableIntStateOf(2) } // default 2 for multi-hop test
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Delivered, 1: TTL & Expiry, 2: Suppressed, 3: Room DB, 4: Relay, 5: Peers
+    var sosMessageText by remember { mutableStateOf("Injured hiker on North Ridge trail, need immediate evacuation") }
+    var senderName by remember { mutableStateOf("Puneet P.") }
+    var medicalNotes by remember { mutableStateOf("Sprained ankle, low water") }
+    var selectedTtl by remember { mutableIntStateOf(8) } // default 8 hops
+    var currentLocation by remember { mutableStateOf<LocationData?>(null) }
+    var isFetchingLocation by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Delivered SOS, 1: TTL & Expiry, 2: Suppressed, 3: Room DB, 4: Relay, 5: Peers
 
     val requiredPermissions = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -119,11 +132,13 @@ fun MeshRouteTtlScreen(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_ADVERTISE,
                 Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
             )
         } else {
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.BLUETOOTH,
                 Manifest.permission.BLUETOOTH_ADMIN
             )
@@ -138,6 +153,7 @@ fun MeshRouteTtlScreen(
                 transport.start()
                 router.start()
                 isRunning = true
+                currentLocation = locationProvider.getLastKnownLocation()
             }
         }
     }
@@ -171,20 +187,20 @@ fun MeshRouteTtlScreen(
                             Text("MeshRoute", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
-                                color = Color(0xFFF59E0B).copy(alpha = 0.2f),
+                                color = Color(0xFFEF4444).copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Text(
-                                    "Phase 6: TTL & Expiry",
+                                    "Phase 7: Real SOS Packet",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFF59E0B),
+                                    color = Color(0xFFEF4444),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
                         Text(
-                            "Node: $selfNodeId • Neighbors: ${neighbors.size} • TTL Bounded",
+                            "Node: $selfNodeId • AES-256 Encrypted • GPS Active",
                             fontSize = 11.sp,
                             color = Color.LightGray,
                             fontFamily = FontFamily.Monospace
@@ -225,7 +241,7 @@ fun MeshRouteTtlScreen(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Metrics Summary Bar with TTL & Expiry Stats
+            // Metrics Summary Bar with SOS Stats
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -238,10 +254,10 @@ fun MeshRouteTtlScreen(
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
-                    title = "TTL Stopped",
-                    count = router.ttlExhaustedCount.get(),
-                    icon = Icons.Default.Block,
-                    color = Color(0xFFF59E0B),
+                    title = "Relayed",
+                    count = router.relayedCount.get(),
+                    icon = Icons.AutoMirrored.Filled.AltRoute,
+                    color = Color(0xFFFFB74D),
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
@@ -252,44 +268,138 @@ fun MeshRouteTtlScreen(
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
-                    title = "Relayed",
-                    count = router.relayedCount.get(),
-                    icon = Icons.Default.AltRoute,
-                    color = Color(0xFFFFB74D),
+                    title = "TTL Stopped",
+                    count = router.ttlExhaustedCount.get(),
+                    icon = Icons.Default.Block,
+                    color = Color(0xFFF59E0B),
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            // Packet Origination Card with Configurable TTL
+            // Real SOS Origination Card (GPS Capture + AES Encryption)
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Originate Bounded Packet", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Emergency, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(18.dp))
+                            Text("Create Encrypted SOS", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        Surface(
+                            color = Color(0xFF10B981).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(10.dp))
+                                Text("AES-256-GCM", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
-                        value = testMessageText,
-                        onValueChange = { testMessageText = it },
-                        label = { Text("Emergency Test Message") },
+                        value = sosMessageText,
+                        onValueChange = { sosMessageText = it },
+                        label = { Text("Emergency Situation") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = senderName,
+                            onValueChange = { senderName = it },
+                            label = { Text("Sender Name") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = medicalNotes,
+                            onValueChange = { medicalNotes = it },
+                            label = { Text("Medical / Notes") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+
+                    // GPS Status & Capture Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = if (currentLocation != null) Color(0xFF38BDF8) else Color.Gray,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            if (currentLocation != null) {
+                                Text(
+                                    "GPS: %.4f, %.4f (±%.0fm)".format(
+                                        currentLocation!!.latitude,
+                                        currentLocation!!.longitude,
+                                        currentLocation!!.accuracy
+                                    ),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF38BDF8)
+                                )
+                            } else {
+                                Text(
+                                    "GPS: Acquired at SOS trigger",
+                                    fontSize = 11.sp,
+                                    color = Color.LightGray
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    isFetchingLocation = true
+                                    currentLocation = locationProvider.getCurrentLocation(3000L)
+                                    isFetchingLocation = false
+                                }
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            if (isFetchingLocation) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFF38BDF8))
+                            } else {
+                                Icon(Icons.Default.MyLocation, contentDescription = "Refresh GPS", tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
 
                     // TTL Selector Chips
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Hop Limit (TTL):", fontSize = 11.sp, color = Color.LightGray)
-                        listOf(1, 2, 4, 8).forEach { ttl ->
+                        Text("TTL:", fontSize = 11.sp, color = Color.LightGray)
+                        listOf(2, 4, 8, 12).forEach { ttl ->
                             FilterChip(
                                 selected = selectedTtl == ttl,
                                 onClick = { selectedTtl = ttl },
                                 label = { Text("$ttl Hops", fontSize = 11.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFF59E0B),
-                                    selectedLabelColor = Color.Black
+                                    selectedContainerColor = Color(0xFFEF4444),
+                                    selectedLabelColor = Color.White
                                 )
                             )
                         }
@@ -298,8 +408,12 @@ fun MeshRouteTtlScreen(
                     Button(
                         onClick = {
                             coroutineScope.launch {
-                                router.originate(
-                                    message = "$testMessageText (#${packetCounter++})",
+                                val loc = locationProvider.getCurrentLocation(2000L) ?: currentLocation
+                                router.originateSos(
+                                    message = sosMessageText,
+                                    location = loc,
+                                    senderName = senderName,
+                                    medicalInfo = medicalNotes,
                                     ttl = selectedTtl
                                 )
                             }
@@ -307,9 +421,9 @@ fun MeshRouteTtlScreen(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
                     ) {
-                        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Broadcast with TTL = $selectedTtl")
+                        Text("BROADCAST ENCRYPTED SOS")
                     }
                 }
             }
@@ -324,7 +438,7 @@ fun MeshRouteTtlScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Delivered (${receivedPackets.size})", fontSize = 11.sp) }
+                    text = { Text("Delivered SOS (${receivedPackets.size})", fontSize = 11.sp) }
                 )
                 Tab(
                     selected = selectedTab == 1,
@@ -362,13 +476,13 @@ fun MeshRouteTtlScreen(
 
             // Tab Content
             when (selectedTab) {
-                0 -> DeliveredPacketsListWithTtl(receivedPackets, selfNodeId)
+                0 -> DeliveredSosList(receivedPackets, selfNodeId)
                 1 -> TtlBoundedList(ttlEvents, expiredEvents)
                 2 -> SuppressedDuplicatesList(duplicateEvents)
                 3 -> RoomStorageList(storedPackets, onClear = {
                     coroutineScope.launch {
                         forwardStore.clearDatabase()
-                        seenSet.clear()
+                        router.seenSet.clear()
                     }
                 })
                 4 -> RelayActivityList(relayEvents, selfNodeId)
@@ -379,8 +493,8 @@ fun MeshRouteTtlScreen(
 }
 
 @Composable
-fun DeliveredPacketsListWithTtl(
-    packets: List<TestPacket>,
+fun DeliveredSosList(
+    packets: List<SosPacket>,
     selfNodeId: String
 ) {
     if (packets.isEmpty()) {
@@ -392,7 +506,7 @@ fun DeliveredPacketsListWithTtl(
                 .background(Color(0xFF141923)),
             contentAlignment = Alignment.Center
         ) {
-            Text("No packets delivered yet.", color = Color.DarkGray, fontSize = 13.sp)
+            Text("No SOS packets delivered yet.", color = Color.DarkGray, fontSize = 13.sp)
         }
     } else {
         val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
@@ -402,142 +516,118 @@ fun DeliveredPacketsListWithTtl(
         ) {
             items(packets) { packet ->
                 val isMaxHops = packet.hops >= packet.ttl
+                // Attempt local decryption using emergency key to display authorized preview
+                val decryptedPayload = remember(packet.payload) {
+                    runCatching {
+                        val json = CryptoManager.decryptString(packet.payload, KeyManager.defaultEmergencyKey)
+                        EmergencyPayload.fromJson(json)
+                    }.getOrNull()
+                }
+
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Surface(
-                                color = if (isMaxHops) Color(0xFFF59E0B) else Color(0xFF64B5F6),
+                                color = Color(0xFFEF4444),
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Text(
-                                    "HOPS: ${packet.hops} / ${packet.ttl}" + (if (isMaxHops) " (MAX)" else ""),
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Black,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                packet.packetId,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = Color(0xFF93C5FD)
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                timeFormat.format(Date(packet.timestamp)),
-                                fontSize = 11.sp,
-                                color = Color.Gray
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "\"${packet.message}\"",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = Color.White
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "Path: " + packet.hopPath.joinToString(" ➔ ") + " ➔ $selfNodeId",
-                            fontSize = 10.sp,
-                            color = Color.LightGray,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TtlBoundedList(
-    ttlEvents: List<TtlExhaustedEvent>,
-    expiredEvents: List<PacketExpiredEvent>
-) {
-    if (ttlEvents.isEmpty() && expiredEvents.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141923)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No packets stopped by TTL or clock expiration yet.", color = Color.DarkGray, fontSize = 12.sp)
-        }
-    } else {
-        val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(ttlEvents) { event ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF3B2813)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = Color(0xFFF59E0B),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    "TTL EXHAUSTED",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Black,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(event.packetId, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFFFDE68A))
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(timeFormat.format(Date(event.timestamp)), fontSize = 10.sp, color = Color.Gray)
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Reached hop limit ${event.currentHops} / ${event.ttl}. Propagation terminated.", fontSize = 11.sp, color = Color(0xFFFEF3C7))
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text("Hop path: ${event.hopPath.joinToString(" ➔ ")}", fontSize = 10.sp, color = Color(0xFFFCD34D), fontFamily = FontFamily.Monospace)
-                    }
-                }
-            }
-
-            items(expiredEvents) { event ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF351A24)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = Color(0xFFEC4899),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    "CLOCK EXPIRED",
+                                    packet.priority,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(event.packetId, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFFFBCFE8))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                color = if (isMaxHops) Color(0xFFF59E0B) else Color(0xFF64B5F6),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    "HOPS: ${packet.hops}/${packet.ttl}",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                packet.messageId,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = Color(0xFF93C5FD)
+                            )
                             Spacer(modifier = Modifier.weight(1f))
-                            Text(timeFormat.format(Date(event.timestamp)), fontSize = 10.sp, color = Color.Gray)
+                            Text(
+                                timeFormat.format(Date(packet.timestamp)),
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Stale packet dropped (created ${event.createdTimestamp}, expired ${event.expiredTimestamp}).", fontSize = 11.sp, color = Color.LightGray)
+
+                        // Decrypted Payload or Ciphertext preview
+                        if (decryptedPayload != null) {
+                            Surface(
+                                color = Color(0xFF0F172A),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.LockOpen, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(12.dp))
+                                        Text("Decrypted Emergency Content:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                    }
+                                    Text("\"${decryptedPayload.message}\"", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                                    if (decryptedPayload.senderName.isNotEmpty() || decryptedPayload.medicalInfo.isNotEmpty()) {
+                                        Text(
+                                            "From: ${decryptedPayload.senderName}  •  Notes: ${decryptedPayload.medicalInfo}",
+                                            fontSize = 10.sp,
+                                            color = Color.LightGray
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Surface(
+                                color = Color(0xFF0F172A),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
+                                        Text("Encrypted Ciphertext (Relay Mode):", fontSize = 10.sp, color = Color(0xFFF59E0B))
+                                    }
+                                    Text(packet.payload.take(48) + "...", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.Gray)
+                                }
+                            }
+                        }
+
+                        // GPS Location Row
+                        packet.location?.let { loc ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(12.dp))
+                                Text(
+                                    "Location: %.5f, %.5f (±%.0fm)".format(loc.latitude, loc.longitude, loc.accuracy),
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF38BDF8)
+                                )
+                            }
+                        }
+
+                        Text(
+                            "Path: " + packet.hopPath.joinToString(" ➔ ") + " ➔ $selfNodeId",
+                            fontSize = 10.sp,
+                            color = Color.LightGray,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 }
             }

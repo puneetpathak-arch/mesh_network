@@ -4,7 +4,7 @@ import android.util.Log
 import com.meshroute.app.data.database.dao.PacketDao
 import com.meshroute.app.data.database.entity.PacketPersistenceStatus
 import com.meshroute.app.data.database.entity.QueuedPacketEntity
-import com.meshroute.app.mesh.transport.TestPacket
+import com.meshroute.app.mesh.transport.SosPacket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -28,20 +28,20 @@ class ForwardStore(
      * Persist an incoming packet to disk immediately as QUEUED.
      * Must be called BEFORE any network transmission attempt.
      */
-    suspend fun persistInbound(packet: TestPacket): QueuedPacketEntity = withContext(Dispatchers.IO) {
-        val entity = QueuedPacketEntity.fromTestPacket(packet, PacketPersistenceStatus.QUEUED)
+    suspend fun persistInbound(packet: SosPacket): QueuedPacketEntity = withContext(Dispatchers.IO) {
+        val entity = QueuedPacketEntity.fromSosPacket(packet, PacketPersistenceStatus.QUEUED)
         packetDao.insert(entity)
-        Log.i(TAG, "Persisted packet ${packet.packetId} to disk as QUEUED (Origin: ${packet.originatorId})")
+        Log.i(TAG, "Persisted packet ${packet.messageId} to disk as QUEUED (Origin: ${packet.originatorId})")
         return@withContext entity
     }
 
     /**
      * Persist an outbound self-originated packet.
      */
-    suspend fun persistOutbound(packet: TestPacket): QueuedPacketEntity = withContext(Dispatchers.IO) {
-        val entity = QueuedPacketEntity.fromTestPacket(packet, PacketPersistenceStatus.QUEUED)
+    suspend fun persistOutbound(packet: SosPacket): QueuedPacketEntity = withContext(Dispatchers.IO) {
+        val entity = QueuedPacketEntity.fromSosPacket(packet, PacketPersistenceStatus.QUEUED)
         packetDao.insert(entity)
-        Log.i(TAG, "Persisted self-originated packet ${packet.packetId} to disk as QUEUED")
+        Log.i(TAG, "Persisted self-originated packet ${packet.messageId} to disk as QUEUED")
         return@withContext entity
     }
 
@@ -58,9 +58,9 @@ class ForwardStore(
     }
 
     /** Retrieve all pending packets that need forwarding (e.g. on restart or reconnect) */
-    suspend fun getPendingUnsentPackets(): List<TestPacket> = withContext(Dispatchers.IO) {
+    suspend fun getPendingUnsentPackets(): List<SosPacket> = withContext(Dispatchers.IO) {
         val entities = packetDao.getPendingQueuedPackets()
-        return@withContext entities.map { it.toTestPacket() }
+        return@withContext entities.map { it.toSosPacket() }
     }
 
     suspend fun clearDatabase() = withContext(Dispatchers.IO) {
