@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.meshroute.app.data.database.AppDatabase
@@ -491,15 +492,25 @@ fun MeshRouteSosScreen(
 
                     // TTL Selector Chips
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("TTL:", fontSize = 11.sp, color = Color.LightGray)
+                        Text("TTL:", fontSize = 11.sp, color = Color.LightGray, fontWeight = FontWeight.SemiBold)
                         listOf(2, 4, 8, 12).forEach { ttl ->
                             FilterChip(
+                                modifier = Modifier.weight(1f),
                                 selected = selectedTtl == ttl,
                                 onClick = { selectedTtl = ttl },
-                                label = { Text("$ttl Hops", fontSize = 11.sp) },
+                                label = {
+                                    Text(
+                                        "$ttl Hops",
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center
+                                    )
+                                },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = Color(0xFFEF4444),
                                     selectedLabelColor = Color.White
