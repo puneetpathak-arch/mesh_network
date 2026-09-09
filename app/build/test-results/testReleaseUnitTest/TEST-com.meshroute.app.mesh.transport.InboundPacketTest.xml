@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.meshroute.app.mesh.transport.InboundPacketTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-08T12:24:35.641Z" hostname="Gods-world" time="0.02">
-  <properties/>
-  <testcase name="testMalformedPacketReturnsNull" classname="com.meshroute.app.mesh.transport.InboundPacketTest" time="0.001"/>
-  <testcase name="testJsonKeysMatchArchitectureSpec" classname="com.meshroute.app.mesh.transport.InboundPacketTest" time="0.019"/>
-  <testcase name="testSosPacketSerializationRoundTrip" classname="com.meshroute.app.mesh.transport.InboundPacketTest" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

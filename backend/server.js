@@ -210,11 +210,11 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`====================================================`);
-    console.log(`🚀 MeshRoute Backend running on port ${PORT}`);
-    console.log(`   Health Check: http://localhost:${PORT}/health`);
-    console.log(`   SOS Endpoint: POST http://localhost:${PORT}/api/sos`);
+    console.log(`🚀 MeshRoute Backend running on port ${PORT} (0.0.0.0)`);
+    console.log(`   Local Check : http://localhost:${PORT}/health`);
+    console.log(`   Phone Endpoint: http://10.173.133.62:${PORT}/api/sos`);
     console.log(`   AES-256-GCM emergency key active for authorized decryption`);
     console.log(`====================================================\n`);
   });

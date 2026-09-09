@@ -335,7 +335,25 @@ class MeshRouter(
                 continue
             }
 
-            val toForward = if (!packet.hopPath.contains(selfNodeId)) {
+            val isRelaying = !packet.hopPath.contains(selfNodeId)
+            val toForward = if (isRelaying) {
+                // Check if the next hop exceeds TTL
+                if (packet.hops + 1 >= packet.ttl) {
+                    ttlExhaustedCount.incrementAndGet()
+                    Log.w(
+                        TAG,
+                        "TTL EXHAUSTED on drain: Packet ${packet.messageId} reached hop limit (${packet.hops + 1}/${packet.ttl})."
+                    )
+                    val ttlEvent = TtlExhaustedEvent(
+                        packetId = packet.messageId,
+                        originatorId = packet.originatorId,
+                        currentHops = packet.hops + 1,
+                        ttl = packet.ttl,
+                        hopPath = packet.hopPath
+                    )
+                    _ttlExhaustedEvents.emit(ttlEvent)
+                    continue
+                }
                 packet.relayedBy(selfNodeId)
             } else {
                 packet
@@ -345,7 +363,19 @@ class MeshRouter(
             if (sent) {
                 restoredFromDiskCount.incrementAndGet()
                 forwardStore.markRelayed(packet.messageId)
-                Log.i(TAG, "Restored & successfully relayed packet ${packet.messageId} from persistent disk storage")
+                if (isRelaying) {
+                    relayedCount.incrementAndGet()
+                    val event = RelayEvent(
+                        packetId = toForward.messageId,
+                        originatorId = toForward.originatorId,
+                        incomingHops = packet.hops,
+                        outgoingHops = toForward.hops,
+                        ttl = toForward.ttl,
+                        hopPath = toForward.hopPath
+                    )
+                    _relayEvents.emit(event)
+                }
+                Log.i(TAG, "Restored & successfully sent packet ${packet.messageId} from persistent disk storage (hops: ${toForward.hops})")
             }
         }
     }

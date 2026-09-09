@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.meshroute.app.data.database.PacketPersistenceTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-08T12:24:32.799Z" hostname="Gods-world" time="0.146">
-  <properties/>
-  <testcase name="testQueuedPacketEntityMappingWithGpsAndEncryption" classname="com.meshroute.app.data.database.PacketPersistenceTest" time="0.142"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

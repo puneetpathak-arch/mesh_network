@@ -105,4 +105,74 @@ class MultiHopRouterTest {
         routerB.stop()
         routerC.stop()
     }
+
+    @Test
+    fun testStoreAndForwardDrainRelay() = runBlocking {
+        // Topology: Node A sends to Node B (offline from C). Later B discovers C and drains queue.
+        val transportA = FakeTransport()
+        val forwardStoreB = createMockForwardStore()
+        val transportB = FakeTransport()
+        val transportC = FakeTransport()
+
+        val routerA = MeshRouter("MR-NODE-A", transportA, createMockForwardStore())
+        val routerB = MeshRouter("MR-NODE-B", transportB, forwardStoreB)
+        val routerC = MeshRouter("MR-NODE-C", transportC, createMockForwardStore())
+
+        routerA.start()
+        routerB.start()
+        routerC.start()
+
+        // 1. Simulate inbound packet reaching B when B has no active neighbors (send returns false)
+        val testPacket = SosPacket(
+            messageId = "SOS-STORE-01",
+            senderId = "MR-NODE-A",
+            originatorId = "MR-NODE-A",
+            ttl = 4,
+            hops = 0,
+            payload = "ENCRYPTED_DATA",
+            hopPath = listOf("MR-NODE-A")
+        )
+        forwardStoreB.persistInbound(testPacket)
+
+        val pending = forwardStoreB.getPendingUnsentPackets()
+        assertEquals(1, pending.size)
+        assertEquals("SOS-STORE-01", pending[0].messageId)
+
+        // 2. Now wire transport B -> C
+        transportB.onSendListener = { data, _ ->
+            runBlocking {
+                transportC.inboundFlow.emit(
+                    InboundPacket(data, "MR-NODE-B", TransportType.LOOPBACK)
+                )
+            }
+        }
+
+        val collectedPacketsAtC = mutableListOf<SosPacket>()
+        val jobC = launch {
+            routerC.deliveredPackets.collect {
+                collectedPacketsAtC.add(it)
+            }
+        }
+
+        // 3. Trigger drain on B
+        routerB.drainPendingQueue()
+
+        kotlinx.coroutines.delay(100L)
+
+        // 4. Verify C received the packet with incremented hop count (hops: 1, path: [A, B])
+        assertEquals(1, collectedPacketsAtC.size)
+        val deliveredToC = collectedPacketsAtC[0]
+        assertEquals("SOS-STORE-01", deliveredToC.messageId)
+        assertEquals(1, deliveredToC.hops)
+        assertEquals(listOf("MR-NODE-A", "MR-NODE-B"), deliveredToC.hopPath)
+
+        // 5. Verify forward store on B marked it as RELAYED
+        val remainingPending = forwardStoreB.getPendingUnsentPackets()
+        assertEquals(0, remainingPending.size)
+
+        jobC.cancel()
+        routerA.stop()
+        routerB.stop()
+        routerC.stop()
+    }
 }

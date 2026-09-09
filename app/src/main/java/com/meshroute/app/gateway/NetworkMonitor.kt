@@ -45,7 +45,7 @@ class AndroidNetworkMonitor(
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
 
-        networkCallback = object : ConnectivityManager.NetworkCallback() {
+        val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 Log.i(TAG, "Internet connection acquired: $network")
                 _isInternetAvailable.value = true
@@ -64,9 +64,10 @@ class AndroidNetworkMonitor(
                 _isInternetAvailable.value = hasInternet
             }
         }
+        networkCallback = cb
 
         runCatching {
-            connectivityManager.registerNetworkCallback(request, networkCallback!!)
+            connectivityManager?.registerNetworkCallback(request, cb)
         }.onFailure {
             Log.e(TAG, "Failed to register network callback: ${it.message}")
         }

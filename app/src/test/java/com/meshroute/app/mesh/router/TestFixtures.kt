@@ -40,10 +40,10 @@ fun createMockForwardStore(): ForwardStore {
         override suspend fun getByStatus(status: String): List<QueuedPacketEntity> = stored.filter { it.status == status }
         override suspend fun getPendingQueuedPackets(): List<QueuedPacketEntity> = stored.filter { it.status == "QUEUED" }
         override suspend fun getPendingUploadPackets(): List<QueuedPacketEntity> = stored.filter { it.status != "UPLOADED" && it.status != "EXPIRED" }
-        override fun observeAll() = kotlinx.coroutines.flow.flowOf(stored)
-        override fun observePendingCount() = kotlinx.coroutines.flow.flowOf(stored.count { it.status == "QUEUED" })
-        override fun observeTotalCount() = kotlinx.coroutines.flow.flowOf(stored.size)
-        override fun observeUploadedCount() = kotlinx.coroutines.flow.flowOf(stored.count { it.status == "UPLOADED" })
+        override fun observeAll() = kotlinx.coroutines.flow.flow { emit(stored.toList()) }
+        override fun observePendingCount() = kotlinx.coroutines.flow.flow { emit(stored.count { it.status == "QUEUED" }) }
+        override fun observeTotalCount() = kotlinx.coroutines.flow.flow { emit(stored.size) }
+        override fun observeUploadedCount() = kotlinx.coroutines.flow.flow { emit(stored.count { it.status == "UPLOADED" }) }
         override suspend fun updateStatus(packetId: String, newStatus: String) {
             val idx = stored.indexOfFirst { it.packetId == packetId }
             if (idx >= 0) stored[idx] = stored[idx].copy(status = newStatus)

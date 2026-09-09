@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.meshroute.app.mesh.router.DiamondRoutingTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-08T12:24:32.950Z" hostname="Gods-world" time="0.255">
-  <properties/>
-  <testcase name="testDiamondTopologySingleDelivery" classname="com.meshroute.app.mesh.router.DiamondRoutingTest" time="0.253"/>
-  <testcase name="testSeenSetBasicDedup" classname="com.meshroute.app.mesh.router.DiamondRoutingTest" time="0.001"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

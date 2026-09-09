@@ -52,7 +52,7 @@ import java.util.*
 
 class MainActivity : ComponentActivity() {
 
-    private val selfNodeId = "MR-" + UUID.randomUUID().toString().take(6).uppercase()
+    private lateinit var selfNodeId: String
     private lateinit var transport: BleMeshTransport
     private lateinit var forwardStore: ForwardStore
     private lateinit var seenSet: SeenSet
@@ -61,9 +61,20 @@ class MainActivity : ComponentActivity() {
     private lateinit var networkMonitor: NetworkMonitor
     private lateinit var gatewayUploader: GatewayUploader
 
+    private fun getOrCreateSelfNodeId(): String {
+        val prefs = getSharedPreferences("meshroute_prefs", MODE_PRIVATE)
+        var nodeId = prefs.getString("self_node_id", null)
+        if (nodeId.isNullOrBlank()) {
+            nodeId = "MR-" + UUID.randomUUID().toString().take(6).uppercase()
+            prefs.edit().putString("self_node_id", nodeId).apply()
+        }
+        return nodeId
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        selfNodeId = getOrCreateSelfNodeId()
         val database = AppDatabase.getInstance(applicationContext)
         forwardStore = ForwardStore(database.packetDao())
         seenSet = SeenSet(database.seenMessageDao())
