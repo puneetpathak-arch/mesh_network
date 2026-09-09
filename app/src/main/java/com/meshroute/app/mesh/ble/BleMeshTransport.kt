@@ -39,6 +39,8 @@ class BleMeshTransport(
     private val _inbound = MutableSharedFlow<InboundPacket>(extraBufferCapacity = 64)
     override val inbound: Flow<InboundPacket> = _inbound.asSharedFlow()
 
+    val powerManager = BlePowerManager(context)
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private var gattServer: BluetoothGattServer? = null
@@ -207,6 +209,7 @@ class BleMeshTransport(
             return@withContext
         }
 
+        powerManager.start()
         setupGattServer()
         startAdvertising()
         startScanning()
@@ -220,6 +223,7 @@ class BleMeshTransport(
         if (!isRunning) return@withContext
         isRunning = false
 
+        powerManager.stop()
         stopScanning()
         stopAdvertising()
         closeGattServer()

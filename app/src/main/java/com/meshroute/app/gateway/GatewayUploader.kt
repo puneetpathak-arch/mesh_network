@@ -52,17 +52,21 @@ class GatewayUploader(
 
     private var monitorJob: Job? = null
 
+    val nostrBridge: NostrRelayBridge = NostrRelayBridge(forwardStore, networkMonitor)
+
     fun start() {
         if (monitorJob?.isActive == true) return
 
         networkMonitor.start()
+        nostrBridge.start()
 
         // Watchdog: whenever connectivity becomes available, drain pending packets
         monitorJob = scope.launch {
             networkMonitor.isInternetAvailable.collect { available ->
                 if (available) {
-                    Log.i(TAG, "GATEWAY: Internet available detected. Triggering queue drain to $backendUrl...")
+                    Log.i(TAG, "GATEWAY: Internet available detected. Triggering queue drain to $backendUrl & Nostr relays...")
                     drainQueue()
+                    nostrBridge.drainQueueToRelays()
                 } else {
                     Log.d(TAG, "GATEWAY: Device offline (mesh relay mode active)")
                 }
@@ -74,6 +78,7 @@ class GatewayUploader(
     fun stop() {
         monitorJob?.cancel()
         monitorJob = null
+        nostrBridge.stop()
         networkMonitor.stop()
         Log.i(TAG, "GatewayUploader stopped")
     }

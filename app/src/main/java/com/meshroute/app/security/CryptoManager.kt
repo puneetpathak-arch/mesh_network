@@ -85,4 +85,44 @@ object CryptoManager {
     fun decodeBase64(str: String): ByteArray {
         return Base64.getDecoder().decode(str.trim())
     }
+
+    /**
+     * Encrypts a Nostr NIP-44 envelope payload (version 2 format: [1-byte version + 32-byte nonce + payload]).
+     */
+    fun encryptNip44Envelope(plaintext: ByteArray, conversationKey: SecretKey): String {
+        val nonce = ByteArray(32).also { secureRandom.nextBytes(it) }
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val spec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, nonce.copyOf(12))
+        cipher.init(Cipher.ENCRYPT_MODE, conversationKey, spec)
+
+        val ciphertext = cipher.doFinal(plaintext)
+        val payload = ByteArray(1 + nonce.size + ciphertext.size)
+        payload[0] = 0x02.toByte() // NIP-44 v2 byte identifier
+        System.arraycopy(nonce, 0, payload, 1, nonce.size)
+        System.arraycopy(ciphertext, 0, payload, 1 + nonce.size, ciphertext.size)
+
+        return encodeBase64(payload)
+    }
+
+    /**
+     * Decrypts a Nostr NIP-44 envelope payload.
+     */
+    fun decryptNip44Envelope(envelopeBase64: String, conversationKey: SecretKey): ByteArray {
+        val payload = decodeBase64(envelopeBase64)
+        require(payload.size > 33) { "Invalid NIP-44 envelope length" }
+        require(payload[0] == 0x02.toByte()) { "Unsupported NIP-44 version ${payload[0]}" }
+
+        val nonce = ByteArray(32)
+        System.arraycopy(payload, 1, nonce, 0, 32)
+
+        val ciphertextLength = payload.size - 33
+        val ciphertext = ByteArray(ciphertextLength)
+        System.arraycopy(payload, 33, ciphertext, 0, ciphertextLength)
+
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val spec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, nonce.copyOf(12))
+        cipher.init(Cipher.DECRYPT_MODE, conversationKey, spec)
+
+        return cipher.doFinal(ciphertext)
+    }
 }
