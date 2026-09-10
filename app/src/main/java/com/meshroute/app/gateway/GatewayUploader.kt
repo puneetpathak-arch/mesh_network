@@ -39,7 +39,7 @@ class GatewayUploader(
 ) {
     companion object {
         private const val TAG = "GatewayUploader"
-        const val DEFAULT_BACKEND_URL = "http://10.0.2.2:3000" // Android Emulator host or LAN IP
+        const val DEFAULT_BACKEND_URL = "https://mesh-network-n9iq.onrender.com" // Live Render backend
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
