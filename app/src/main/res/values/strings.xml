@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">MeshRoute</string>
+    <string name="send_sos">SEND SOS</string>
+    <string name="create_sos">Create SOS</string>
+    <string name="network_details">Network Details</string>
+    <string name="developer_mode">Developer Mode</string>
+    <string name="reach_hops">Reach (Relay distance)</string>
+    <string name="location_ready">Location ready</string>
+    <string name="location_unavailable">Location unavailable — Move outdoors or retry GPS</string>
 </resources>
