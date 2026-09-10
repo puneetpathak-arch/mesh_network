@@ -15,11 +15,14 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.meshroute.app.MainActivity
 import com.meshroute.app.R
+import com.meshroute.app.data.database.AppDatabase
+import com.meshroute.app.data.queue.ForwardStore
 import com.meshroute.app.gateway.AndroidNetworkMonitor
 import com.meshroute.app.gateway.GatewayUploader
 import com.meshroute.app.gateway.NetworkMonitor
 import com.meshroute.app.mesh.ble.BleMeshTransport
 import com.meshroute.app.mesh.router.MeshRouter
+import com.meshroute.app.mesh.router.SeenSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -121,15 +124,34 @@ class MeshForegroundService : Service() {
         if (isRunning) return
         isRunning = true
 
-        val nodeId = "Node_${Build.MODEL.replace(" ", "_")}_${(1000..9999).random()}"
+        val prefs = getSharedPreferences("meshroute_prefs", Context.MODE_PRIVATE)
+        val nodeId = prefs.getString("self_node_id", null) ?: "Node_${Build.MODEL.replace(" ", "_")}_${(1000..9999).random()}"
         val transport = BleMeshTransport(applicationContext, nodeId)
+        val database = AppDatabase.getInstance(applicationContext)
+        val forwardStore = ForwardStore(database.packetDao())
+        val seenSet = SeenSet(database.seenMessageDao())
+        val router = MeshRouter(nodeId, transport, forwardStore, seenSet)
         val netMonitor = AndroidNetworkMonitor(applicationContext)
+        val uploader = GatewayUploader(forwardStore, netMonitor)
 
         this.bleTransport = transport
+        this.router = router
+        this.gatewayUploader = uploader
+
+        SosNotificationHelper.createNotificationChannel(applicationContext)
 
         scope.launch {
             transport.start()
-            Log.i(TAG, "BLE Transport started under FGS for node: $nodeId")
+            router.start()
+            uploader.start()
+            Log.i(TAG, "BLE Transport & MeshRouter started under FGS for node: $nodeId")
+
+            // Listen for delivered SOS packets and trigger rich notifications
+            router.deliveredPackets.collect { packet ->
+                Log.i(TAG, "FGS received SOS packet ${packet.messageId} - dispatching emergency notification")
+                SosNotificationHelper.showSosNotification(applicationContext, packet)
+                uploader.triggerUpload()
+            }
         }
     }
 
@@ -138,6 +160,7 @@ class MeshForegroundService : Service() {
         isRunning = false
 
         scope.launch {
+            router?.stop()
             bleTransport?.stop()
             gatewayUploader?.stop()
             Log.i(TAG, "Mesh operations stopped under FGS")

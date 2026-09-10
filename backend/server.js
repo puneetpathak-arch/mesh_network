@@ -7,6 +7,10 @@
  * - GET  /api/sos/:id    : Retrieve incident status by message_id
  * - GET  /api/sos        : List all stored incidents
  * - GET  /health         : Health check
+ *
+ * Notifications:
+ * - Telegram Bot alert sent on every new (non-duplicate) SOS receipt
+ * - Set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID env vars to enable
  */
 
 const http = require('http');
@@ -207,7 +211,7 @@ const server = http.createServer((req, res) => {
       incidents.set(messageId, incidentRecord);
       incidentLog.unshift(incidentRecord);
 
-      // 4. Trigger Emergency Notification
+      // 4. Trigger Emergency Notification (console log / emergency dispatch)
       dispatchEmergencyNotification(incidentRecord, decryptResult.data);
 
       return sendJson(res, 201, {

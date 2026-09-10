@@ -27,6 +27,7 @@ import com.meshroute.app.mesh.ble.BleMeshTransport
 import com.meshroute.app.mesh.router.*
 import com.meshroute.app.mesh.transport.LocationData
 import com.meshroute.app.mesh.transport.SosPacket
+import com.meshroute.app.service.SosNotificationHelper
 import com.meshroute.app.ui.screens.MainSosScreen
 import com.meshroute.app.ui.screens.NetworkDetailsScreen
 import com.meshroute.app.ui.theme.DarkBackground
@@ -144,22 +145,23 @@ fun MeshRouteApp(
     var isBroadcasting by remember { mutableStateOf(false) }
 
     val requiredPermissions = remember {
+        val list = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_ADVERTISE,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
+            list.add(Manifest.permission.BLUETOOTH_SCAN)
+            list.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            list.add(Manifest.permission.BLUETOOTH_CONNECT)
+            list.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            list.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         } else {
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN
-            )
+            list.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            list.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            list.add(Manifest.permission.BLUETOOTH)
+            list.add(Manifest.permission.BLUETOOTH_ADMIN)
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            list.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        list.toTypedArray()
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -176,6 +178,7 @@ fun MeshRouteApp(
     }
 
     LaunchedEffect(Unit) {
+        SosNotificationHelper.createNotificationChannel(activity)
         val hasAll = requiredPermissions.all {
             ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED
         }
@@ -193,6 +196,7 @@ fun MeshRouteApp(
     LaunchedEffect(Unit) {
         router.deliveredPackets.collect { packet ->
             receivedPackets.add(0, packet)
+            SosNotificationHelper.showSosNotification(activity, packet)
             gatewayUploader.triggerUpload()
         }
     }
