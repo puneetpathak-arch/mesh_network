@@ -17,7 +17,6 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { sendTelegramAlert } = require('./notifier');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -212,12 +211,8 @@ const server = http.createServer((req, res) => {
       incidents.set(messageId, incidentRecord);
       incidentLog.unshift(incidentRecord);
 
-      // 4. Trigger Emergency Notification (console log + Telegram alert)
+      // 4. Trigger Emergency Notification (console log / emergency dispatch)
       dispatchEmergencyNotification(incidentRecord, decryptResult.data);
-      // Non-blocking: fire-and-forget — SOS response is never delayed by notification
-      sendTelegramAlert(incidentRecord, decryptResult.data).catch(err =>
-        console.error('[SERVER] Unexpected notifier error:', err)
-      );
 
       return sendJson(res, 201, {
         status: 'ACCEPTED',
