@@ -45,41 +45,51 @@ function _markNotified(messageId) {
 }
 
 /**
- * Formats a rich Telegram message for a new SOS incident.
+ * Escapes HTML special characters so Telegram's HTML parse mode doesn't break.
+ */
+function _esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Formats a rich HTML Telegram message for a new SOS incident.
  */
 function _formatMessage(incident, decrypted) {
   const ts = new Date(incident.received_at).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
-  const hopPath = (incident.hop_path || []).join(' ➔ ');
+  const hopPath = (incident.hop_path || []).join(' → ');
 
   let lines = [
-    `🚨 *MESHROUTE SOS ALERT* 🚨`,
+    `🚨 <b>MESHROUTE SOS ALERT</b> 🚨`,
     ``,
-    `📋 *Incident:* \`${incident.incident_id}\``,
-    `🆔 *Message ID:* \`${incident.message_id}\``,
-    `⚡ *Priority:* ${incident.priority}`,
-    `📱 *Origin Device:* ${incident.originator_id || incident.gateway_node}`,
-    `🔀 *Hops:* ${incident.hops} (TTL: ${incident.ttl})`,
-    `🛤️ *Path:* ${hopPath || 'N/A'}`,
+    `📋 <b>Incident:</b> <code>${_esc(incident.incident_id)}</code>`,
+    `🆔 <b>Message ID:</b> <code>${_esc(incident.message_id)}</code>`,
+    `⚡ <b>Priority:</b> ${_esc(incident.priority)}`,
+    `📱 <b>Origin Device:</b> ${_esc(incident.originator_id || incident.gateway_node)}`,
+    `🔀 <b>Hops:</b> ${_esc(incident.hops)} (TTL: ${_esc(incident.ttl)})`,
+    `🛤 <b>Path:</b> ${_esc(hopPath || 'N/A')}`,
   ];
 
   if (incident.location) {
     const { latitude, longitude, accuracy } = incident.location;
-    lines.push(`📍 *Location:* ${latitude}, ${longitude} (±${accuracy || 0}m)`);
-    lines.push(`🗺️ *Map:* https://maps.google.com/?q=${latitude},${longitude}`);
+    lines.push(`📍 <b>Location:</b> ${_esc(latitude)}, ${_esc(longitude)} (±${_esc(accuracy || 0)}m)`);
+    lines.push(`🗺 <b>Map:</b> https://maps.google.com/?q=${_esc(latitude)},${_esc(longitude)}`);
   } else {
-    lines.push(`📍 *Location:* Not available`);
+    lines.push(`📍 <b>Location:</b> Not available`);
   }
 
   if (decrypted) {
-    if (decrypted.message)       lines.push(`💬 *Message:* "${decrypted.message}"`);
-    if (decrypted.sender_name)   lines.push(`👤 *Sender:* ${decrypted.sender_name}`);
-    if (decrypted.medical_info)  lines.push(`🏥 *Medical:* ${decrypted.medical_info}`);
-    if (decrypted.battery_percent >= 0) lines.push(`🔋 *Battery:* ${decrypted.battery_percent}%`);
+    if (decrypted.message)               lines.push(`💬 <b>Message:</b> "${_esc(decrypted.message)}"`);
+    if (decrypted.sender_name)           lines.push(`👤 <b>Sender:</b> ${_esc(decrypted.sender_name)}`);
+    if (decrypted.medical_info)          lines.push(`🏥 <b>Medical:</b> ${_esc(decrypted.medical_info)}`);
+    if (decrypted.battery_percent >= 0)  lines.push(`🔋 <b>Battery:</b> ${_esc(decrypted.battery_percent)}%`);
   } else {
-    lines.push(`🔒 *Payload:* Encrypted (decryption failed)`);
+    lines.push(`🔒 <b>Payload:</b> Encrypted (decryption failed)`);
   }
 
-  lines.push(`🕐 *Received:* ${ts}`);
+  lines.push(`🕐 <b>Received:</b> ${_esc(ts)}`);
 
   return lines.join('\n');
 }
@@ -93,7 +103,7 @@ function _telegramPost(text) {
     const payload = JSON.stringify({
       chat_id: TELEGRAM_CHAT_ID,
       text,
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       disable_web_page_preview: false
     });
 
