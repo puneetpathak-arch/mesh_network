@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: meshroute
+    env: node
+    plan: free
+    buildCommand: ""
+    startCommand: node backend/server.js
+    envVars:
+      - key: PORT
+        value: 10000
