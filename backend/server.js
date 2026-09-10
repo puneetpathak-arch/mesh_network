@@ -11,8 +11,23 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
-const PORT = process.env.PORT || 3000;
+const ROOT_DIR = path.resolve(__dirname, '..');
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8'
+};
 const EMERGENCY_PASSPHRASE = 'MeshRoute-Emergency-Broadcast-Key-2026';
 const EMERGENCY_KEY = crypto.createHash('sha256').update(EMERGENCY_PASSPHRASE).digest();
 
@@ -203,6 +218,21 @@ const server = http.createServer((req, res) => {
       });
     });
     return;
+  }
+
+  // Static File Serving (Landing Page & Assets)
+  if (req.method === 'GET') {
+    let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
+    // Prevent directory traversal
+    const safePath = path.normalize(filePath).replace(/^(\.\.[\/\\])+/, '');
+    const absolutePath = path.join(ROOT_DIR, safePath);
+
+    if (fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
+      const ext = path.extname(absolutePath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': contentType });
+      return fs.createReadStream(absolutePath).pipe(res);
+    }
   }
 
   // 404 for unknown endpoints

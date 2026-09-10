@@ -1,0 +1,23 @@
+{
+  "name": "meshroute",
+  "version": "1.0.0",
+  "description": "MeshRoute - Offline-First Emergency Mesh Networking System & Backend Gateway",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "test": "node backend/test_api.js",
+    "dev": "node backend/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mesh",
+    "emergency",
+    "ble",
+    "offline-first",
+    "sos"
+  ],
+  "author": "MeshRoute Team",
+  "license": "MIT"
+}
