@@ -1,10 +1,10 @@
 services:
   - type: web
     name: meshroute
-    env: node
+    env: docker
     plan: free
-    buildCommand: ""
-    startCommand: node backend/server.js
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: PORT
+        generateValue: false
         value: 10000

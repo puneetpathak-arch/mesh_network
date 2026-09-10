@@ -28,6 +28,8 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8'
 };
+
+const PORT = process.env.PORT || 3000;
 const EMERGENCY_PASSPHRASE = 'MeshRoute-Emergency-Broadcast-Key-2026';
 const EMERGENCY_KEY = crypto.createHash('sha256').update(EMERGENCY_PASSPHRASE).digest();
 
