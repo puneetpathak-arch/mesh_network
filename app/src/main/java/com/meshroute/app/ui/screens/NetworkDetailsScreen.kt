@@ -28,6 +28,8 @@ import com.meshroute.app.ui.components.MetricCard
 import com.meshroute.app.ui.theme.*
 import kotlinx.coroutines.launch
 
+import com.meshroute.app.ui.components.RoutingBenchmarkCard
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NetworkDetailsScreen(
@@ -52,6 +54,8 @@ fun NetworkDetailsScreen(
     var isDeveloperModeEnabled by remember { mutableStateOf(false) }
     var backendUrlInput by remember { mutableStateOf(gatewayUploader.backendUrl) }
     var selectedDiagnosticTab by remember { mutableIntStateOf(0) }
+    val metricsSnapshot by router.metricsCollector.metricsFlow.collectAsState()
+    var currentStrategyType by remember { mutableStateOf(router.routingStrategy.type) }
 
     Scaffold(
         topBar = {
@@ -95,6 +99,19 @@ fun NetworkDetailsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // ─── Section 0: Routing Strategy & Telemetry Benchmark ─────────────────
+            RoutingBenchmarkCard(
+                metrics = metricsSnapshot,
+                currentStrategy = currentStrategyType,
+                onSelectStrategy = { newType ->
+                    currentStrategyType = newType
+                    router.routingStrategy = when (newType) {
+                        RoutingStrategyType.EPIDEMIC_FLOODING -> EpidemicRoutingStrategy()
+                        RoutingStrategyType.INTELLIGENT_EDS -> EdsRoutingStrategy()
+                    }
+                }
+            )
+
             // ─── Section 1: Packet Statistics (5 counters) ──────────────────────────
             Text(
                 text = "PACKET STATISTICS",

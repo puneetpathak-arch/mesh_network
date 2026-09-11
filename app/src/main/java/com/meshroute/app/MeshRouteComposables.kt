@@ -93,16 +93,31 @@ fun NeighborsList(neighbors: Set<Peer>) {
                         }
                     }
                     Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                peer.nodeId,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = if (peer.lastEdsScore >= 60) AccentGreen.copy(alpha = 0.2f) else WarningAmber.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    "EDS: ${peer.lastEdsScore}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (peer.lastEdsScore >= 60) AccentGreen else WarningAmber,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                         Text(
-                            peer.nodeId,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = TextPrimary
-                        )
-                        Text(
-                            "${peer.deviceName} • ${peer.transportType.name}",
-                            fontSize = 11.sp,
+                            "Bat: ${peer.batteryLevel}% • Mob: ${when(peer.mobilityCode.toInt()) { 2 -> "Fast"; 1 -> "Walk"; else -> "Stationary" }} • Uplink: ${(peer.gatewayLikelihood * 100).toInt()}%",
+                            fontSize = 10.sp,
                             color = TextSecondary
                         )
                     }
