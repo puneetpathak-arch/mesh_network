@@ -173,22 +173,25 @@ fun MainSosScreen(
                             }
                         }
 
-                        // Frosted circular info icon button
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0x3310243E),
-                            border = BorderStroke(1.dp, Color(0x3338BDF8)),
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clickable { onNavigateToNetworkDetails() }
+                        // Frosted circular info icon button with generous touch target
+                        IconButton(
+                            onClick = onNavigateToNetworkDetails,
+                            modifier = Modifier.size(38.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Info,
-                                    contentDescription = "Network Details",
-                                    tint = Color(0xFF8DA4C4),
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0x3310243E),
+                                border = BorderStroke(1.dp, Color(0x3338BDF8)),
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        contentDescription = "Network Details",
+                                        tint = Color(0xFF8DA4C4),
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
                             }
                         }
                     }
