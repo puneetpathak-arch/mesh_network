@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeshRoute — Emergency SOS Admin Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0A0F1D;
+      --surface-dark: #131D31;
+      --surface-card: #18243C;
+      --border-dark: #243250;
+      --red-emergency: #FF453A;
+      --red-subtle: rgba(255, 69, 58, 0.18);
+      --green-emerald: #10B981;
+      --green-subtle: rgba(16, 185, 129, 0.18);
+      --amber-warning: #F59E0B;
+      --amber-subtle: rgba(245, 158, 11, 0.18);
+      --blue-sky: #38BDF8;
+      --text-primary: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ─── Top Navigation Header ─── */
+    header {
+      background-color: var(--surface-dark);
+      border-bottom: 1px solid var(--border-dark);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, #FF453A, #B91C1C);
+      color: white;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 0 16px rgba(255, 69, 58, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .header-stats {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .stat-pill {
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .stat-pill .count {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--red-emergency);
+    }
+
+    .live-pulse-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--green-emerald);
+      padding: 4px 10px;
+      background: var(--green-subtle);
+      border-radius: 20px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--green-emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green-emerald);
+      animation: pulse-green 1.5s infinite;
+    }
+
+    @keyframes pulse-green {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    /* ─── Main Content Layout ─── */
+    main {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 64px);
+      overflow: hidden;
+    }
+
+    #map-container {
+      flex: 1;
+      position: relative;
+      background-color: #050811;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ─── Sidebar ─── */
+    sidebar {
+      width: 420px;
+      background-color: var(--surface-dark);
+      border-left: 1px solid var(--border-dark);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-dark);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .feed-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .feed-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .feed-container::-webkit-scrollbar-thumb {
+      background-color: var(--border-dark);
+      border-radius: 4px;
+    }
+
+    /* ─── Incident Card ─── */
+    .sos-card {
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-dark);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sos-card:hover {
+      border-color: var(--blue-sky);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .sos-card.highlight-new {
+      animation: highlight-border 2.5s ease-out;
+    }
+
+    @keyframes highlight-border {
+      0% { border-color: var(--red-emergency); box-shadow: 0 0 20px rgba(255, 69, 58, 0.6); }
+      100% { border-color: var(--border-dark); box-shadow: none; }
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .sender-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sender-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .message-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--blue-sky);
+    }
+
+    .strategy-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .strategy-ier {
+      background-color: var(--green-subtle);
+      color: var(--green-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .strategy-epidemic {
+      background-color: var(--amber-subtle);
+      color: var(--amber-warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .emergency-text {
+      font-size: 13px;
+      color: #E2E8F0;
+      background-color: rgba(0, 0, 0, 0.25);
+      border-left: 3px solid var(--red-emergency);
+      padding: 8px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .medical-alert {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--red-emergency);
+      background-color: var(--red-subtle);
+      border: 1px solid rgba(255, 69, 58, 0.3);
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 8px;
+    }
+
+    .badges {
+      display: flex;
+      gap: 6px;
+    }
+
+    .mini-badge {
+      background-color: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+    }
+
+    /* ─── Custom Pulsing Map Marker ─── */
+    .sos-marker-pin {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--red-emergency);
+      border: 2px solid white;
+      box-shadow: 0 0 10px var(--red-emergency);
+      position: relative;
+    }
+
+    .sos-marker-pin::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: -2px;
+      left: -2px;
+      border-radius: 50%;
+      border: 2px solid var(--red-emergency);
+      animation: marker-pulse 2s infinite ease-out;
+    }
+
+    @keyframes marker-pulse {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2.6); opacity: 0; }
+    }
+
+    /* ─── Leaflet Dark Popup Overrides ─── */
+    .leaflet-popup-content-wrapper {
+      background-color: var(--surface-card) !important;
+      color: var(--text-primary) !important;
+      border: 1px solid var(--border-dark);
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6) !important;
+    }
+    .leaflet-popup-tip {
+      background-color: var(--surface-card) !important;
+    }
+    .popup-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 4px;
+      color: var(--red-emergency);
+    }
+    .popup-msg {
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: #F1F5F9;
+    }
+    .popup-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-dark);
+      padding-top: 6px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="logo-badge">
+        <span>🚨</span>
+        <span>MeshRoute SOS</span>
+      </div>
+      <div>
+        <div class="brand-title">Emergency Egress Gateway Dashboard</div>
+        <div class="brand-subtitle">Off-Grid Multi-Hop Store-Carry-Forward Mesh Monitor</div>
+      </div>
+    </div>
+
+    <div class="header-stats">
+      <div class="stat-pill">
+        <span>Received SOS Packets:</span>
+        <span class="count" id="total-sos-count">0</span>
+      </div>
+      <div class="live-pulse-wrapper">
+        <div class="live-dot"></div>
+        <span>GATEWAY ONLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="map-container">
+      <div id="map"></div>
+    </div>
+
+    <sidebar>
+      <div class="sidebar-header">
+        <span class="sidebar-title">Live SOS Ingestion Feed</span>
+        <span id="feed-status" style="font-size: 11px; color: var(--text-muted);">Polling 2.5s</span>
+      </div>
+      <div class="feed-container" id="sos-feed">
+        <div class="empty-state">
+          No SOS emergency packets received yet.<br>
+          Packets routed via nearby smartphones to this gateway will appear live on the map.
+        </div>
+      </div>
+    </sidebar>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Initialize Map with Dark Matter tiles
+    const map = leaflet.map('map', { zoomControl: true }).setView([36.1069, -112.1129], 6);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> | MeshRoute Rescue System',
+      maxZoom: 19
+    }).addTo(map);
+
+    const markerGroup = L.featureGroup().addTo(map);
+    const markersMap = new Map();
+    const seenEventIds = new Set();
+    let isInitialLoad = true;
+
+    // Custom glowing pulsing HTML marker
+    const pulseIcon = L.divIcon({
+      className: 'custom-sos-pin',
+      html: '<div class="sos-marker-pin"></div>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+      popupAnchor: [0, -12]
+    });
+
+    function formatTime(timestamp) {
+      if (!timestamp) return 'Just now';
+      const deltaSec = Math.floor((Date.now() - timestamp) / 1000);
+      if (deltaSec < 60) return `${deltaSec}s ago`;
+      const deltaMin = Math.floor(deltaSec / 60);
+      if (deltaMin < 60) return `${deltaMin}m ago`;
+      return new Date(timestamp).toLocaleTimeString();
+    }
+
+    function renderFeedCard(event, isNew = false) {
+      const card = document.createElement('div');
+      card.className = `sos-card ${isNew ? 'highlight-new' : ''}`;
+      card.id = `card-${event.messageId}`;
+
+      // Strategy determination (Phase 4 polish)
+      const isIer = event.routingStrategy ? event.routingStrategy.includes('IER') : (event.hopCount > 1);
+      const strategyClass = isIer ? 'strategy-ier' : 'strategy-epidemic';
+      const strategyLabel = isIer ? 'IER (EDS)' : 'Epidemic';
+
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="sender-info">
+            <span class="sender-name">${escapeHtml(event.senderName || 'Unknown Hiker')}</span>
+            <span class="message-id">${escapeHtml(event.messageId)}</span>
+          </div>
+          <span class="strategy-badge ${strategyClass}">${strategyLabel}</span>
+        </div>
+
+        <div class="emergency-text">
+          "${escapeHtml(event.message || 'SOS Emergency Alert')}"
+        </div>
+
+        ${event.medicalNote && event.medicalNote !== 'None' ? `
+          <div class="medical-alert">
+            <span>⚕️</span>
+            <span>Medical: ${escapeHtml(event.medicalNote)}</span>
+          </div>
+        ` : ''}
+
+        <div class="card-footer">
+          <div class="badges">
+            <span class="mini-badge">Hops: ${event.hopCount ?? 0}</span>
+            <span class="mini-badge">TTL: ${event.ttl ?? 8}</span>
+            ${event.lat && event.lon ? `<span class="mini-badge">${event.lat.toFixed(4)}, ${event.lon.toFixed(4)}</span>` : ''}
+          </div>
+          <span>${formatTime(event.receivedAt)}</span>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        if (event.lat && event.lon) {
+          map.flyTo([event.lat, event.lon], 13, { duration: 1.2 });
+          const marker = markersMap.get(event.messageId);
+          if (marker) marker.openPopup();
+        }
+      });
+
+      return card;
+    }
+
+    function updateMapMarker(event) {
+      if (!event.lat || !event.lon) return;
+
+      if (markersMap.has(event.messageId)) return;
+
+      const isIer = event.routingStrategy ? event.routingStrategy.includes('IER') : (event.hopCount > 1);
+      const strategyLabel = isIer ? 'IER (Emergency Delivery Score)' : 'Epidemic Flooding';
+
+      const popupContent = `
+        <div>
+          <div class="popup-title">🚨 SOS: ${escapeHtml(event.senderName || 'Unknown')}</div>
+          <div class="popup-msg">"${escapeHtml(event.message || '')}"</div>
+          ${event.medicalNote ? `<div style="font-size:11px;color:#FF453A;margin-bottom:6px;"><strong>Medical:</strong> ${escapeHtml(event.medicalNote)}</div>` : ''}
+          <div class="popup-meta">
+            Routing: <strong>${strategyLabel}</strong><br>
+            Hops Traversed: ${event.hopCount} | Remaining TTL: ${event.ttl}<br>
+            GPS: ${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}<br>
+            <a href="https://maps.google.com/?q=${event.lat},${event.lon}" target="_blank" style="color:#38BDF8;text-decoration:none;display:inline-block;margin-top:4px;">View on Google Maps ↗</a>
+          </div>
+        </div>
+      `;
+
+      const marker = L.marker([event.lat, event.lon], { icon: pulseIcon })
+        .bindPopup(popupContent);
+
+      markerGroup.addLayer(marker);
+      markersMap.set(event.messageId, marker);
+    }
+
+    function updateDashboard(events) {
+      const countEl = document.getElementById('total-sos-count');
+      const feedContainer = document.getElementById('sos-feed');
+
+      countEl.textContent = events.length;
+
+      if (events.length === 0) {
+        feedContainer.innerHTML = `
+          <div class="empty-state">
+            No SOS emergency packets received yet.<br>
+            Packets routed via nearby smartphones to this gateway will appear live on the map.
+          </div>
+        `;
+        return;
+      }
+
+      let hasNewMarkers = false;
+      feedContainer.innerHTML = '';
+
+      events.forEach(event => {
+        const isNew = !seenEventIds.has(event.messageId);
+        if (isNew) {
+          seenEventIds.add(event.messageId);
+          hasNewMarkers = true;
+        }
+
+        updateMapMarker(event);
+        feedContainer.appendChild(renderFeedCard(event, isNew && !isInitialLoad));
+      });
+
+      // Auto-fit bounds (Phase 4 polish)
+      if (hasNewMarkers && markerGroup.getLayers().length > 0) {
+        if (isInitialLoad || markerGroup.getLayers().length <= 3) {
+          map.fitBounds(markerGroup.getBounds().pad(0.2));
+        }
+      }
+
+      isInitialLoad = false;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.innerText = str;
+      return div.innerHTML;
+    }
+
+    // ─── Polling Routine (Phase 2 & 3) ───
+    async function fetchEvents() {
+      try {
+        const res = await fetch('/api/sos-events');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.events)) {
+            updateDashboard(data.events);
+          }
+        }
+      } catch (err) {
+        console.warn('Polling error:', err);
+      }
+    }
+
+    // Initial fetch + 2.5s interval polling
+    fetchEvents();
+    setInterval(fetchEvents, 2500);
+
+    // ─── SSE Live Stream (Instant push fallback) ───
+    if (window.EventSource) {
+      const sse = new EventSource('/api/sos-events/stream');
+      sse.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'SNAPSHOT' && Array.isArray(msg.events)) {
+            updateDashboard(msg.events);
+          } else if (msg.type === 'NEW_SOS' && msg.event) {
+            fetchEvents();
+          }
+        } catch (_) {}
+      };
+    }
+  </script>
+</body>
+</html>
