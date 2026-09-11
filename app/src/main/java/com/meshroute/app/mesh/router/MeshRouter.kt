@@ -4,6 +4,7 @@ import android.util.Log
 import com.meshroute.app.data.queue.ForwardStore
 import com.meshroute.app.mesh.transport.LocationData
 import com.meshroute.app.mesh.transport.MeshTransport
+import com.meshroute.app.mesh.transport.Peer
 import com.meshroute.app.mesh.transport.SosPacket
 import com.meshroute.app.security.CryptoManager
 import com.meshroute.app.security.EmergencyPayload
@@ -49,17 +50,36 @@ data class PacketExpiredEvent(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+data class ForwardingDecisionsEvent(
+    val packetId: String,
+    val strategyName: String,
+    val decisions: List<ForwardingDecision>,
+    val forwardedCount: Int,
+    val suppressedCount: Int,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 class MeshRouter(
     val selfNodeId: String,
     private val transport: MeshTransport,
     val forwardStore: ForwardStore,
-    val seenSet: SeenSet = SeenSet()
+    val seenSet: SeenSet = SeenSet(),
+    initialStrategy: RoutingStrategy = EdsRoutingStrategy()
 ) {
     companion object {
         private const val TAG = "MeshRouter"
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    var routingStrategy: RoutingStrategy = initialStrategy
+        set(value) {
+            field = value
+            metricsCollector.updateSnapshot(value.displayName)
+            Log.i(TAG, "Switched routing strategy to: ${value.displayName}")
+        }
+
+    val metricsCollector = DeliveryMetricsCollector()
 
     private val _deliveredPackets = MutableSharedFlow<SosPacket>(replay = 16, extraBufferCapacity = 128)
     val deliveredPackets: Flow<SosPacket> = _deliveredPackets.asSharedFlow()
@@ -76,6 +96,9 @@ class MeshRouter(
     private val _expiredEvents = MutableSharedFlow<PacketExpiredEvent>(replay = 16, extraBufferCapacity = 128)
     val expiredEvents: Flow<PacketExpiredEvent> = _expiredEvents.asSharedFlow()
 
+    private val _decisionsEvents = MutableSharedFlow<ForwardingDecisionsEvent>(replay = 16, extraBufferCapacity = 128)
+    val decisionsEvents: Flow<ForwardingDecisionsEvent> = _decisionsEvents.asSharedFlow()
+
     val originatedCount = AtomicInteger(0)
     val relayedCount = AtomicInteger(0)
     val receivedCount = AtomicInteger(0)
@@ -86,6 +109,10 @@ class MeshRouter(
 
     private var routingJob: Job? = null
     private var queueDrainJob: Job? = null
+
+    init {
+        metricsCollector.updateSnapshot(routingStrategy.displayName)
+    }
 
     fun start() {
         if (routingJob?.isActive == true) return
@@ -99,41 +126,38 @@ class MeshRouter(
 
         // 2. Queue-draining watchdog: drain held packets when neighbors appear
         queueDrainJob = scope.launch {
+            var previousNeighborCount = 0
             transport.neighbors.collect { currentNeighbors ->
-                if (currentNeighbors.isNotEmpty()) {
+                val count = currentNeighbors.size
+                if (count > 0 && previousNeighborCount == 0) {
+                    Log.i(TAG, "New mesh neighbors detected ($count visible). Draining held queue...")
                     drainPendingQueue()
                 }
+                previousNeighborCount = count
             }
         }
 
-        // 3. Initial startup tasks: load seen cache and drain pending queue
-        scope.launch {
-            seenSet.loadFromStorage()
-            drainPendingQueue()
-        }
-
-        Log.i(TAG, "MeshRouter started on node: $selfNodeId (SOS Encryption & GPS support active)")
+        Log.i(TAG, "MeshRouter active for node: $selfNodeId with strategy [${routingStrategy.displayName}]")
     }
 
     fun stop() {
         routingJob?.cancel()
-        queueDrainJob?.cancel()
         routingJob = null
+        queueDrainJob?.cancel()
         queueDrainJob = null
         scope.coroutineContext.cancelChildren()
-        Log.i(TAG, "MeshRouter stopped on node: $selfNodeId")
+        Log.i(TAG, "MeshRouter stopped")
     }
 
     /**
-     * Originate a real SOS emergency packet with GPS location and AES-256-GCM encrypted payload.
-     * The emergency payload is encrypted before touching local persistence or the transport layer.
+     * Phase 7: Originates an authentic encrypted SOS emergency packet.
      */
     suspend fun originateSos(
         message: String,
         location: LocationData? = null,
-        senderName: String = "User",
-        medicalInfo: String = "",
-        batteryPercent: Int = -1,
+        senderName: String = "Unknown Hiker",
+        medicalInfo: String? = null,
+        batteryPercent: Int = 100,
         targetId: String? = null,
         ttl: Int = SosPacket.DEFAULT_TTL,
         lifetimeMs: Long = SosPacket.DEFAULT_LIFETIME_MS,
@@ -145,7 +169,7 @@ class MeshRouter(
         val emergencyPayload = EmergencyPayload(
             message = message,
             senderName = senderName,
-            medicalInfo = medicalInfo,
+            medicalInfo = medicalInfo ?: "",
             batteryPercent = batteryPercent,
             timestamp = now
         )
@@ -182,10 +206,37 @@ class MeshRouter(
             "Originating encrypted SOS packet: ${packet.messageId} (TTL: ${packet.ttl}, GPS: ${packet.location?.latitude ?: "N/A"}, ${packet.location?.longitude ?: "N/A"}, Payload bytes: ${encryptedCiphertextBase64.length})"
         )
 
-        // 4. Transmit over radio transport
-        val sent = transport.send(packet.toByteArray())
-        if (sent) {
-            forwardStore.markRelayed(packet.messageId)
+        // 4. Evaluate forwarding targets using active routing strategy
+        val neighbors = transport.neighbors.value
+        val context = RoutingContext(selfNodeId = selfNodeId, localBatteryPercent = batteryPercent)
+        val decisions = routingStrategy.evaluateTargets(packet, neighbors, context)
+        val shouldTransmit = neighbors.isEmpty() || decisions.any { it.shouldForward }
+
+        val forwardedCount = decisions.count { it.shouldForward }
+        val suppressedByScore = decisions.count { !it.shouldForward && !packet.hopPath.contains(it.peer.nodeId) }
+
+        _decisionsEvents.emit(
+            ForwardingDecisionsEvent(
+                packetId = packet.messageId,
+                strategyName = routingStrategy.displayName,
+                decisions = decisions,
+                forwardedCount = forwardedCount,
+                suppressedCount = suppressedByScore
+            )
+        )
+
+        if (suppressedByScore > 0) {
+            metricsCollector.recordSelectiveSuppression(suppressedByScore)
+        }
+
+        if (shouldTransmit) {
+            val sent = transport.send(packet.toByteArray())
+            if (sent) {
+                metricsCollector.recordTransmission()
+                forwardStore.markRelayed(packet.messageId)
+            }
+        } else {
+            Log.i(TAG, "Selective routing suppressed all immediate transmissions for ${packet.messageId}")
         }
 
         return@withContext packet
@@ -239,6 +290,7 @@ class MeshRouter(
         val isFirstSighting = seenSet.add(packet.messageId)
         if (!isFirstSighting) {
             suppressedCount.incrementAndGet()
+            metricsCollector.recordDuplicateSuppressed()
             Log.w(
                 TAG,
                 "DUPLICATE SUPPRESSED: ${packet.messageId} from ${packet.senderId} (Already seen!)"
@@ -292,6 +344,7 @@ class MeshRouter(
         // Prepare relayed copy with incremented hop count
         val relayed = packet.relayedBy(selfNodeId)
         relayedCount.incrementAndGet()
+        metricsCollector.recordHopRelayed()
 
         val event = RelayEvent(
             packetId = packet.messageId,
@@ -308,10 +361,37 @@ class MeshRouter(
             "Relaying encrypted SOS ${relayed.messageId}: Hop ${packet.hops} ➔ ${relayed.hops}/${packet.ttl} (Path: ${relayed.hopPath.joinToString(" ➔ ")})"
         )
 
-        // Forward to reachable neighbors
-        val sent = transport.send(relayed.toByteArray())
-        if (sent) {
-            forwardStore.markRelayed(packet.messageId)
+        // ─── Evaluate Selective Targets via Routing Strategy ───
+        val neighbors = transport.neighbors.value
+        val context = RoutingContext(selfNodeId = selfNodeId)
+        val decisions = routingStrategy.evaluateTargets(relayed, neighbors, context)
+        val shouldForward = neighbors.isEmpty() || decisions.any { it.shouldForward }
+
+        val forwardedCount = decisions.count { it.shouldForward }
+        val suppressedByScore = decisions.count { !it.shouldForward && !relayed.hopPath.contains(it.peer.nodeId) }
+
+        _decisionsEvents.emit(
+            ForwardingDecisionsEvent(
+                packetId = relayed.messageId,
+                strategyName = routingStrategy.displayName,
+                decisions = decisions,
+                forwardedCount = forwardedCount,
+                suppressedCount = suppressedByScore
+            )
+        )
+
+        if (suppressedByScore > 0) {
+            metricsCollector.recordSelectiveSuppression(suppressedByScore)
+        }
+
+        if (shouldForward) {
+            val sent = transport.send(relayed.toByteArray())
+            if (sent) {
+                metricsCollector.recordTransmission()
+                forwardStore.markRelayed(packet.messageId)
+            }
+        } else {
+            Log.i(TAG, "EDS suppressed immediate relay forwarding for ${relayed.messageId} (Stored for better carrier)")
         }
     }
 
@@ -362,9 +442,11 @@ class MeshRouter(
             val sent = transport.send(toForward.toByteArray())
             if (sent) {
                 restoredFromDiskCount.incrementAndGet()
+                metricsCollector.recordTransmission()
                 forwardStore.markRelayed(packet.messageId)
                 if (isRelaying) {
                     relayedCount.incrementAndGet()
+                    metricsCollector.recordHopRelayed()
                     val event = RelayEvent(
                         packetId = toForward.messageId,
                         originatorId = toForward.originatorId,

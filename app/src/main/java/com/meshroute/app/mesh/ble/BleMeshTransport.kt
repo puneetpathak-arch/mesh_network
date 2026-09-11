@@ -79,14 +79,25 @@ class BleMeshTransport(
             return
         }
 
-        val discoveredNodeId = if (serviceData != null && serviceData.isNotEmpty()) {
-            serviceData.decodeToString()
+        var discoveredNodeId = ""
+        var telemetry: NodeTelemetryBeacon? = null
+
+        if (serviceData != null && serviceData.isNotEmpty()) {
+            if (serviceData.size >= 5) {
+                // If serviceData has trailing 4 bytes for telemetry
+                val telemetryBytes = serviceData.takeLast(4).toByteArray()
+                telemetry = NodeTelemetryBeacon.fromByteArray(telemetryBytes)
+                val idBytes = serviceData.dropLast(4).toByteArray()
+                discoveredNodeId = idBytes.decodeToString()
+            } else {
+                discoveredNodeId = serviceData.decodeToString()
+            }
         } else {
-            result.device.name ?: result.device.address
+            discoveredNodeId = result.device.name ?: result.device.address
         }
 
-        if (discoveredNodeId == selfNodeId) {
-            // Do not discover self
+        if (discoveredNodeId.isBlank() || discoveredNodeId == selfNodeId) {
+            // Do not discover self or empty id
             return
         }
 
@@ -107,7 +118,12 @@ class BleMeshTransport(
             deviceName = deviceName,
             transportType = TransportType.BLE,
             rssi = result.rssi,
-            lastSeenTimestamp = System.currentTimeMillis()
+            lastSeenTimestamp = System.currentTimeMillis(),
+            batteryLevel = telemetry?.batteryPercent ?: 100,
+            isCharging = telemetry?.isCharging ?: false,
+            mobilityCode = telemetry?.mobilityState?.code ?: 0,
+            gatewayLikelihood = (telemetry?.gatewayLikelihoodPercent ?: 50) / 100f,
+            queueLoad = telemetry?.queueLoad ?: 0
         )
 
         peerMap[discoveredNodeId] = peer
@@ -270,6 +286,8 @@ class BleMeshTransport(
         gattServer = null
     }
 
+    var telemetryProvider: (() -> NodeTelemetryBeacon)? = null
+
     private fun startAdvertising() {
         advertiser = bluetoothAdapter?.bluetoothLeAdvertiser
         if (advertiser == null) {
@@ -291,10 +309,14 @@ class BleMeshTransport(
             .addServiceUuid(ParcelUuid(BleConstants.SERVICE_UUID))
             .build()
 
-        // 2. Scan Response Data (contains Node ID in Service Data, fits in 31-byte scan response)
+        // 2. Scan Response Data (contains Node ID + 4-byte Telemetry in Service Data, fits easily in 31-byte scan response)
+        val idBytes = selfNodeId.encodeToByteArray()
+        val telemetryBytes = telemetryProvider?.invoke()?.toByteArray() ?: ByteArray(0)
+        val combinedServiceData = idBytes + telemetryBytes
+
         val scanResponseData = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
-            .addServiceData(ParcelUuid(BleConstants.SERVICE_UUID), selfNodeId.encodeToByteArray())
+            .addServiceData(ParcelUuid(BleConstants.SERVICE_UUID), combinedServiceData)
             .build()
 
         advertiser?.startAdvertising(settings, advertiseData, scanResponseData, advertiseCallback)

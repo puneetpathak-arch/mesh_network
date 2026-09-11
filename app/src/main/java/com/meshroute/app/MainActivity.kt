@@ -61,6 +61,8 @@ class MainActivity : ComponentActivity() {
         return nodeId
     }
 
+    private lateinit var mobilityEstimator: com.meshroute.app.sensor.MobilityEstimator
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -73,6 +75,17 @@ class MainActivity : ComponentActivity() {
         locationProvider = AndroidGpsLocationProvider(applicationContext)
         networkMonitor = AndroidNetworkMonitor(applicationContext)
         gatewayUploader = GatewayUploader(forwardStore, networkMonitor)
+        mobilityEstimator = com.meshroute.app.sensor.MobilityEstimator(applicationContext).apply { start() }
+
+        transport.telemetryProvider = {
+            com.meshroute.app.mesh.ble.NodeTelemetryBeacon(
+                batteryPercent = transport.powerManager.batteryLevel.value,
+                isCharging = false,
+                mobilityState = mobilityEstimator.currentMobility.value,
+                gatewayLikelihoodPercent = if (networkMonitor.isInternetAvailable.value) 95 else 35,
+                queueLoad = 0
+            )
+        }
 
         setContent {
             MeshRouteTheme {
@@ -97,6 +110,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mobilityEstimator.stop()
         router.stop()
         gatewayUploader.stop()
     }

@@ -156,11 +156,11 @@
 <nav><div class="container nav-inner"><a href="#hero" class="nav-logo"><div class="logo-icon">&#x2B21;</div>MeshRoute</a><ul class="nav-links"><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#usecases">Use cases</a></li><li><a href="#faq">FAQ</a></li></ul><a href="#download" class="nav-cta">Download APK</a><button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button></div></nav>
 <div class="mobile-menu" id="mobileMenu"><a href="#how" class="mobile-link">How it works</a><a href="#features" class="mobile-link">Features</a><a href="#usecases" class="mobile-link">Use cases</a><a href="#faq" class="mobile-link">FAQ</a><a href="#download" class="nav-cta mobile-link">&#x2B07; Download APK</a></div>
 <section id="hero"><div class="container"><div class="hero-grid"><div>
-  <div class="hero-badge fade-up"><span class="dot"></span>Now live &middot; v1.0.0 &middot; Android</div>
+  <div class="hero-badge fade-up"><span class="dot"></span>Now live &middot; Latest Build &middot; Android</div>
   <h1 class="hero-title fade-up delay-1">Connected<br/><span class="gradient-text">Without Limits.</span><br/>Without Internet.</h1>
   <p class="hero-sub fade-up delay-2">MeshRoute turns every Android phone into a relay node &mdash; forming a self-healing BLE mesh that carries emergency SOS messages across kilometers with zero cell or Wi-Fi signal.</p>
   <div class="hero-actions fade-up delay-3">
-    <a id="heroApkBtn" href="https://github.com/aviii1229/mesh_network/releases/download/v1.0.0/app-debug.apk" class="btn-primary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download APK</a>
+    <a id="heroApkBtn" href="https://github.com/puneetpathak-arch/mesh_network/releases/download/latest/meshroute.apk" class="btn-primary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download APK</a>
     <a href="#how" class="btn-secondary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>How it works</a>
   </div>
   <div class="hero-meta fade-up delay-4"><div class="hero-stat"><div class="num">100m+</div><div class="lbl">BLE range per hop</div></div><div class="hero-stat"><div class="num">E2E</div><div class="lbl">Noise encrypted</div></div><div class="hero-stat"><div class="num">API 26+</div><div class="lbl">Android 8.0+</div></div></div>
@@ -245,12 +245,12 @@
   <div class="section-tag">FAQ</div>
   <h2 class="section-title">Common questions</h2>
   <div class="faq-list">
-    <div class="faq-item"><div class="faq-q">How do I install the APK on my Android phone?<div class="faq-icon">+</div></div><div class="faq-a">Download the APK, then go to <strong>Settings &rarr; Security &rarr; Install unknown apps</strong>. Enable it for your browser, then tap the downloaded APK. Android 8.0+ prompts per-app &mdash; tap Allow, then open the APK. Installs in seconds.</div></div>
+    <div class="faq-item"><div class="faq-q">How do I install the APK on my Android phone?<div class="faq-icon">+</div></div><div class="faq-a">Download the APK, then tap the downloaded file. When prompted, tap <strong>Settings &rarr; Allow from this source</strong> to enable installation for your browser. Android 8.0+ prompts per-app &mdash; tap Install, and MeshRoute is ready to use in seconds.</div></div>
     <div class="faq-item"><div class="faq-q">Does it need Bluetooth and location permissions?<div class="faq-icon">+</div></div><div class="faq-a">Yes &mdash; BLE scanning on Android requires location permission (an Android OS requirement). We also request Nearby Devices on Android 12+. We never transmit your GPS without an explicit SOS trigger.</div></div>
     <div class="faq-item"><div class="faq-q">How far can a message travel across the mesh?<div class="faq-icon">+</div></div><div class="faq-a">Each hop covers ~50&ndash;100m. There is no limit to hops &mdash; as long as there's a chain of MeshRoute devices between sender and gateway, the message will be delivered.</div></div>
     <div class="faq-item"><div class="faq-q">Is the message content encrypted?<div class="faq-icon">+</div></div><div class="faq-a">Yes. All payloads are encrypted using the <strong>Noise Protocol Framework</strong> (XX handshake). Even relay nodes only forward encrypted bytes &mdash; they cannot read content.</div></div>
     <div class="faq-item"><div class="faq-q">What happens if there's no gateway phone with internet?<div class="faq-icon">+</div></div><div class="faq-a">Messages are persisted in a local Room database on every relay node. As soon as any node gains internet, queued messages upload automatically. Nothing is ever lost.</div></div>
-    <div class="faq-item"><div class="faq-q">Is this open source? Can I contribute?<div class="faq-icon">+</div></div><div class="faq-a">Yes &mdash; full source at <strong>github.com/aviii1229/mesh_network</strong>. Issues and PRs welcome. Roadmap includes iOS BLE support and a LoRa radio bridge for even longer range.</div></div>
+    <div class="faq-item"><div class="faq-q">Is this open source? Can I contribute?<div class="faq-icon">+</div></div><div class="faq-a">Yes &mdash; full source at <strong>github.com/puneetpathak-arch/mesh_network</strong>. Issues and PRs welcome. Roadmap includes iOS BLE support and a LoRa radio bridge for even longer range.</div></div>
   </div>
 </div></section>
 
@@ -259,19 +259,19 @@
   <h2 class="section-title">Download MeshRoute</h2>
   <p class="section-sub" style="margin:0 auto 48px">Free. Open source. Works on any Android 8.0+ device. No account required.</p>
   <div class="download-card">
-    <a id="mainApkBtn" href="https://github.com/aviii1229/mesh_network/releases/download/v1.0.0/app-debug.apk" class="btn-download">
+    <a id="mainApkBtn" href="https://github.com/puneetpathak-arch/mesh_network/releases/download/latest/meshroute.apk" class="btn-download">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <div class="dl-meta"><span class="dl-label">Download for Android</span><span class="dl-info">v1.0.0 &middot; 15.5 MB &middot; Debug build</span></div>
+      <div class="dl-meta"><span class="dl-label">Download for Android</span><span class="dl-info">Latest Build &middot; Auto-updated &middot; Official APK</span></div>
     </a>
     <div class="qr-wrap">
       <p>&#x1F4F1; Scan on your phone to download directly</p>
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=https%3A%2F%2Fgithub.com%2Faviii1229%2Fmesh_network%2Freleases%2Fdownload%2Fv1.0.0%2Fapp-debug.apk&bgcolor=ffffff&color=000000&margin=2" alt="QR code to download MeshRoute APK" width="140" height="140" style="border-radius:8px;background:white;padding:8px" />
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=https%3A%2F%2Fgithub.com%2Fpuneetpathak-arch%2Fmesh_network%2Freleases%2Fdownload%2Flatest%2Fmeshroute.apk&bgcolor=ffffff&color=000000&margin=2" alt="QR code to download MeshRoute APK" width="140" height="140" style="border-radius:8px;background:white;padding:8px" />
     </div>
     <div class="install-steps">
-      <h4>&#x1F4CB; Install in 3 steps</h4>
-      <div class="install-step"><div class="n">1</div><span>Tap the button above to download <code>app-debug.apk</code></span></div>
-      <div class="install-step"><div class="n">2</div><span>Allow installation from unknown sources in your browser settings when prompted</span></div>
-      <div class="install-step"><div class="n">3</div><span>Open the downloaded file &mdash; grant Bluetooth &amp; Nearby Devices permissions when asked.</span></div>
+      <h4>&#x1F4CB; Install in 3 easy steps</h4>
+      <div class="install-step"><div class="n">1</div><span>Tap the button above to download <code>meshroute.apk</code> directly</span></div>
+      <div class="install-step"><div class="n">2</div><span>Open the downloaded file &mdash; tap <em>Allow from this source</em> if Android prompts for install permission</span></div>
+      <div class="install-step"><div class="n">3</div><span>Launch MeshRoute &mdash; grant Bluetooth, Nearby Devices &amp; Location permissions when requested</span></div>
     </div>
   </div>
 </div></div></section>
@@ -281,17 +281,17 @@
     <div class="footer-brand">
       <div class="nav-logo" style="margin-bottom:0"><div class="logo-icon">&#x2B21;</div>MeshRoute</div>
       <p>A decentralized BLE mesh network for emergency SOS relay. Open source. No infrastructure required. Built to work when everything else fails.</p>
-      <a id="footerApkBtn" href="https://github.com/aviii1229/mesh_network/releases/download/v1.0.0/app-debug.apk" class="footer-apk">&#x2B07; Download APK v1.0.0</a>
+      <a id="footerApkBtn" href="https://github.com/puneetpathak-arch/mesh_network/releases/download/latest/meshroute.apk" class="footer-apk">&#x2B07; Download APK (Latest)</a>
     </div>
     <div class="footer-col"><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#usecases">Use cases</a></li><li><a href="#viz">Network viz</a></li><li><a href="#download">Download</a></li></ul></div>
-    <div class="footer-col"><h4>Resources</h4><ul><li><a href="https://github.com/aviii1229/mesh_network" target="_blank">GitHub repo</a></li><li><a href="https://github.com/aviii1229/mesh_network/releases" target="_blank">Releases</a></li><li><a href="https://github.com/aviii1229/mesh_network/issues" target="_blank">Report a bug</a></li><li><a href="#faq">FAQ</a></li></ul></div>
-    <div class="footer-col"><h4>Connect</h4><ul><li><a href="https://github.com/aviii1229" target="_blank">GitHub</a></li><li><a href="mailto:contact@meshroute.app">Email us</a></li></ul><div class="social-links" style="margin-top:16px"><a href="https://github.com/aviii1229/mesh_network" target="_blank" class="social-link">&#x2B21;</a><a href="mailto:contact@meshroute.app" class="social-link">&#x2709;</a></div></div>
+    <div class="footer-col"><h4>Resources</h4><ul><li><a href="https://github.com/puneetpathak-arch/mesh_network" target="_blank">GitHub repo</a></li><li><a href="https://github.com/puneetpathak-arch/mesh_network/releases" target="_blank">Releases</a></li><li><a href="https://github.com/puneetpathak-arch/mesh_network/issues" target="_blank">Report a bug</a></li><li><a href="#faq">FAQ</a></li></ul></div>
+    <div class="footer-col"><h4>Connect</h4><ul><li><a href="https://github.com/puneetpathak-arch" target="_blank">GitHub</a></li><li><a href="mailto:contact@meshroute.app">Email us</a></li></ul><div class="social-links" style="margin-top:16px"><a href="https://github.com/puneetpathak-arch/mesh_network" target="_blank" class="social-link">&#x2B21;</a><a href="mailto:contact@meshroute.app" class="social-link">&#x2709;</a></div></div>
   </div>
   <div class="footer-bottom"><span>&copy; 2026 MeshRoute. Open source under MIT License.</span><span>Built with &#x2764; for the moments that matter most.</span></div>
 </div></footer>
 
 <script>
-const APK_URL="https://github.com/aviii1229/mesh_network/releases/download/v1.0.0/app-debug.apk";
+const APK_URL="https://github.com/puneetpathak-arch/mesh_network/releases/download/latest/meshroute.apk";
 const hamburger=document.getElementById('hamburger'),mobileMenu=document.getElementById('mobileMenu');
 hamburger.addEventListener('click',()=>mobileMenu.classList.toggle('open'));
 document.querySelectorAll('.mobile-link').forEach(l=>l.addEventListener('click',()=>mobileMenu.classList.remove('open')));
