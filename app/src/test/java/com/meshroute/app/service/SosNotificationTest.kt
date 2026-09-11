@@ -48,11 +48,12 @@ class SosNotificationTest {
         // Verify decryption matches
         val decryptedJson = CryptoManager.decryptString(packet.payload, KeyManager.defaultEmergencyKey)
         val extracted = EmergencyPayload.fromJson(decryptedJson)
+        assertNotNull("Decrypted payload should not be null", extracted)
 
-        assertEquals(messageText, extracted.message)
-        assertEquals(sender, extracted.senderName)
-        assertEquals(medical, extracted.medicalInfo)
-        assertEquals(battery, extracted.batteryPercent)
+        assertEquals(messageText, extracted?.message)
+        assertEquals(sender, extracted?.senderName)
+        assertEquals(medical, extracted?.medicalInfo)
+        assertEquals(battery, extracted?.batteryPercent)
 
         // Verify Coordinate representation
         val latStr = String.format(Locale.US, "%.5f", packet.location!!.latitude)
@@ -87,7 +88,8 @@ class SosNotificationTest {
         assertNull(packet.location)
         val decryptedJson = CryptoManager.decryptString(packet.payload, KeyManager.defaultEmergencyKey)
         val extracted = EmergencyPayload.fromJson(decryptedJson)
-        assertEquals("Bob", extracted.senderName)
-        assertEquals("Trapped in cave, need search and rescue", extracted.message)
+        assertNotNull("Decrypted payload should not be null", extracted)
+        assertEquals("Bob", extracted?.senderName)
+        assertEquals("Trapped in cave, need search and rescue", extracted?.message)
     }
 }

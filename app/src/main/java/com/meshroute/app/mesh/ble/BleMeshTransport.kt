@@ -21,7 +21,10 @@ class BleMeshTransport(
     companion object {
         private const val TAG = "BleMeshTransport"
         private const val CHUNK_HEADER_MAGIC: Byte = 0xBE.toByte()
-        private const val MAX_CHUNK_PAYLOAD_SIZE = 480
+        /** Conservative fallback if MTU negotiation fails or is not yet complete. */
+        private const val DEFAULT_MTU = 23
+        /** ATT protocol overhead per write (1 opcode + 2 handle bytes). */
+        private const val ATT_HEADER_BYTES = 3
     }
 
     override val transportType: TransportType = TransportType.BLE
@@ -407,14 +410,20 @@ class BleMeshTransport(
         return@withContext anySuccess
     }
 
-    private fun fragmentData(data: ByteArray): List<ByteArray> {
+    /**
+     * Fragments [data] into BLE-safe chunks sized to fit within the negotiated [negotiatedMtu].
+     * Each chunk frame is: [magic(1)] [hash(1)] [index(1)] [total(1)] [payload(n)]
+     * Max payload per chunk = negotiatedMtu - ATT_HEADER_BYTES - 4 (chunk header).
+     */
+    private fun fragmentData(data: ByteArray, negotiatedMtu: Int): List<ByteArray> {
+        val maxPayloadSize = (negotiatedMtu - ATT_HEADER_BYTES - 4).coerceAtLeast(1)
         val packetHash = (data.contentHashCode() and 0xFF).toByte()
         val chunks = mutableListOf<ByteArray>()
-        val totalChunks = ((data.size + MAX_CHUNK_PAYLOAD_SIZE - 1) / MAX_CHUNK_PAYLOAD_SIZE).coerceAtLeast(1)
+        val totalChunks = ((data.size + maxPayloadSize - 1) / maxPayloadSize).coerceAtLeast(1)
 
         for (i in 0 until totalChunks) {
-            val start = i * MAX_CHUNK_PAYLOAD_SIZE
-            val end = (start + MAX_CHUNK_PAYLOAD_SIZE).coerceAtMost(data.size)
+            val start = i * maxPayloadSize
+            val end = (start + maxPayloadSize).coerceAtMost(data.size)
             val chunkPayload = data.copyOfRange(start, end)
 
             val frame = ByteArray(4 + chunkPayload.size)
@@ -439,11 +448,14 @@ class BleMeshTransport(
                 return@suspendCancellableCoroutine
             }
 
-            val chunks = fragmentData(data)
+            // Chunks are built after MTU negotiation in onMtuChanged / onServicesDiscovered.
+            var chunks = emptyList<ByteArray>()
             var currentChunkIndex = 0
             var gattClient: BluetoothGatt? = null
             var writeCharRef: BluetoothGattCharacteristic? = null
             var serviceDiscoveryStarted = false
+            // Track the actual negotiated MTU; fall back to BLE default (23) if negotiation fails.
+            var negotiatedMtu = DEFAULT_MTU
 
             val gattCallback = object : BluetoothGattCallback() {
                 override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -451,6 +463,9 @@ class BleMeshTransport(
                         Log.d(TAG, "GATT Client connected to ${peer.nodeId}, requesting MTU...")
                         val mtuOk = gatt.requestMtu(BleConstants.MAX_MTU)
                         if (!mtuOk && !serviceDiscoveryStarted) {
+                            // MTU request not supported; proceed with default MTU.
+                            Log.w(TAG, "requestMtu() returned false for ${peer.nodeId}, using default MTU $negotiatedMtu")
+                            chunks = fragmentData(data, negotiatedMtu)
                             serviceDiscoveryStarted = true
                             gatt.discoverServices()
                         }
@@ -463,7 +478,10 @@ class BleMeshTransport(
                 }
 
                 override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-                    Log.d(TAG, "GATT MTU set to $mtu, discovering services...")
+                    // Capture the actual negotiated MTU and fragment using it.
+                    negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else DEFAULT_MTU
+                    Log.d(TAG, "GATT MTU negotiated to $negotiatedMtu for ${peer.nodeId}, discovering services...")
+                    chunks = fragmentData(data, negotiatedMtu)
                     if (!serviceDiscoveryStarted) {
                         serviceDiscoveryStarted = true
                         gatt.discoverServices()
@@ -477,9 +495,15 @@ class BleMeshTransport(
                         writeCharRef = writeChar
 
                         if (writeChar != null) {
+                            // Ensure chunks are built even if onMtuChanged was never called.
+                            if (chunks.isEmpty()) {
+                                Log.w(TAG, "Chunks not yet built for ${peer.nodeId}; using current negotiatedMtu=$negotiatedMtu")
+                                chunks = fragmentData(data, negotiatedMtu)
+                            }
                             scope.launch {
                                 delay(200L)
                                 currentChunkIndex = 0
+                                Log.d(TAG, "Sending ${chunks.size} chunk(s) to ${peer.nodeId} (MTU=$negotiatedMtu, chunk frames: ${chunks.map { it.size }} bytes)")
                                 val writeSuccess = attemptWrite(gatt, writeChar, chunks[0], peer.nodeId)
                                 if (!writeSuccess) {
                                     Log.e(TAG, "Failed to initiate writeCharacteristic for chunk 0 to ${peer.nodeId}")
