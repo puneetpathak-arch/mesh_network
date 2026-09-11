@@ -432,7 +432,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // Initialize Map with Dark Matter tiles
-    const map = leaflet.map('map', { zoomControl: true }).setView([36.1069, -112.1129], 6);
+    const map = L.map('map', { zoomControl: true }).setView([36.1069, -112.1129], 6);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a> | MeshRoute Rescue System',
