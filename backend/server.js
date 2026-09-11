@@ -46,6 +46,74 @@ const MAX_SOS_STORE_SIZE = 500;
 const decryptedSosStore = [];
 const sseClients = new Set();
 
+const https = require('https');
+const UPSTREAM_RENDER_URL = process.env.UPSTREAM_RENDER_URL || 'https://mesh-network-n9iq.onrender.com';
+
+/**
+ * Periodically syncs live emergency packets from the cloud Render gateway
+ * into the local dashboard store so packets sent from mobile phones show up immediately.
+ */
+function syncUpstreamIncidents() {
+  const reqUrl = `${UPSTREAM_RENDER_URL}/api/sos`;
+  https.get(reqUrl, { timeout: 6000 }, (res) => {
+    if (res.statusCode !== 200) return;
+    let data = '';
+    res.on('data', c => { data += c; });
+    res.on('end', () => {
+      try {
+        const json = JSON.parse(data);
+        if (!json || !Array.isArray(json.incidents)) return;
+
+        let newCount = 0;
+        for (const inc of json.incidents) {
+          const msgId = inc.message_id;
+          if (!incidents.has(msgId)) {
+            incidents.set(msgId, inc);
+            incidentLog.push(inc);
+
+            const dec = inc.decrypted_payload || {};
+            const storeRecord = {
+              messageId: msgId,
+              senderName: dec.sender_name || inc.originator_id || 'Mobile Hiker',
+              message: dec.message || 'Emergency SOS received from mobile mesh',
+              lat: inc.location ? inc.location.latitude : null,
+              lon: inc.location ? inc.location.longitude : null,
+              medicalNote: dec.medical_info || '',
+              hopCount: inc.hops ?? 0,
+              ttl: inc.ttl ?? 8,
+              routingStrategy: inc.hops > 1 ? 'IER (EDS)' : 'Direct Gateway',
+              receivedAt: inc.received_at || Date.now()
+            };
+
+            decryptedSosStore.unshift(storeRecord);
+            if (decryptedSosStore.length > MAX_SOS_STORE_SIZE) {
+              decryptedSosStore.pop();
+            }
+            newCount++;
+
+            // Push to connected dashboard SSE clients immediately
+            for (const client of sseClients) {
+              try {
+                client.write(`data: ${JSON.stringify({ type: 'NEW_SOS', event: storeRecord })}\n\n`);
+              } catch (_) {
+                sseClients.delete(client);
+              }
+            }
+          }
+        }
+
+        if (newCount > 0) {
+          console.log(`[UPSTREAM SYNC] Successfully synced ${newCount} live mobile SOS incident(s) from Render (${UPSTREAM_RENDER_URL})`);
+        }
+      } catch (_) {}
+    });
+  }).on('error', () => {});
+}
+
+// Initial sync on boot + poll every 4 seconds
+syncUpstreamIncidents();
+setInterval(syncUpstreamIncidents, 4000);
+
 /**
  * Decrypts AES-256-GCM emergency payload
  * Format: Base64 of [12-byte IV + ciphertext + 16-byte GCM authentication tag]
@@ -101,26 +169,27 @@ function dispatchEmergencyNotification(incident, decrypted) {
   console.log(separator + '\n');
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Access-Control-Request-Private-Network, Authorization',
+  'Access-Control-Allow-Private-Network': 'true'
+};
+
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    ...CORS_HEADERS
   });
   res.end(JSON.stringify(data));
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
-  // Handle CORS Preflight
+  // Handle CORS Preflight (including Chrome/Edge Private Network Access)
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    });
+    res.writeHead(204, CORS_HEADERS);
     return res.end();
   }
 
@@ -167,7 +236,7 @@ const server = http.createServer((req, res) => {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*'
+      ...CORS_HEADERS
     });
     // Send initial snapshot on connect
     res.write(`data: ${JSON.stringify({ type: 'SNAPSHOT', count: decryptedSosStore.length, events: decryptedSosStore })}\n\n`);
@@ -289,6 +358,72 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Helper for admin/testing: POST /api/sos/simulate
+  if (req.method === 'POST' && (url.pathname === '/api/sos/simulate' || url.pathname === '/api/sos-events/simulate')) {
+    const sampleHikers = ['Alex Rivera', 'Elena Rostova', 'Marcus Vance', 'Priya Sharma', 'Chen Wei'];
+    const sampleMsgs = [
+      'Trapped on cliff ledge below Bright Angel Trail. Ankle injury.',
+      'Flash flood warning in slot canyon, two group members stranded.',
+      'Dehydration and heat exhaustion, requesting emergency water and evacuation.',
+      'Hypothermia symptoms after sudden blizzard, shelter compromised.',
+      'Medical emergency: compound leg fracture, severe bleeding controlled.'
+    ];
+    const sampleMedical = ['Compound fracture, conscious', 'Heat exhaustion / dehydrated', 'Severe hypothermia', 'Ankle sprain, unable to walk', 'Asthma attack, inhaler depleted'];
+    const strategies = ['IER (EDS)', 'Epidemic'];
+
+    const idx = Math.floor(Math.random() * sampleHikers.length);
+    const lat = +(36.05 + (Math.random() * 0.20)).toFixed(5);
+    const lon = +(-112.20 + (Math.random() * 0.25)).toFixed(5);
+    const hops = Math.floor(Math.random() * 4) + 1;
+    const strat = strategies[Math.floor(Math.random() * strategies.length)];
+    const simMsgId = 'SOS-SIM-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(2).toString('hex').toUpperCase();
+
+    const simEvent = {
+      messageId: simMsgId,
+      senderName: sampleHikers[idx],
+      message: sampleMsgs[idx],
+      lat: lat,
+      lon: lon,
+      medicalNote: sampleMedical[idx],
+      hopCount: hops,
+      ttl: Math.max(1, 8 - hops),
+      routingStrategy: strat,
+      receivedAt: Date.now()
+    };
+
+    decryptedSosStore.unshift(simEvent);
+    if (decryptedSosStore.length > MAX_SOS_STORE_SIZE) {
+      decryptedSosStore.pop();
+    }
+
+    // Broadcast to SSE clients
+    for (const client of sseClients) {
+      try {
+        client.write(`data: ${JSON.stringify({ type: 'NEW_SOS', event: simEvent })}\n\n`);
+      } catch (_) {
+        sseClients.delete(client);
+      }
+    }
+
+    console.log(`[SIMULATE] Generated mock emergency packet: ${simMsgId} for ${simEvent.senderName}`);
+    return sendJson(res, 201, { status: 'SIMULATED', event: simEvent });
+  }
+
+  // Helper for admin/testing: POST /api/sos/clear
+  if (req.method === 'POST' && (url.pathname === '/api/sos/clear' || url.pathname === '/api/sos-events/clear')) {
+    decryptedSosStore.length = 0;
+    incidents.clear();
+    incidentLog.length = 0;
+    for (const client of sseClients) {
+      try {
+        client.write(`data: ${JSON.stringify({ type: 'SNAPSHOT', count: 0, events: [] })}\n\n`);
+      } catch (_) {
+        sseClients.delete(client);
+      }
+    }
+    return sendJson(res, 200, { status: 'CLEARED', message: 'All SOS incident records reset' });
+  }
+
   // Phase 3 & 4: Live SOS Dashboard Frontend (Leaflet Map + Admin Feed)
   if (req.method === 'GET' && (url.pathname === '/dashboard' || url.pathname === '/dashboard.html')) {
     const dashPath = path.join(__dirname, 'public', 'dashboard.html');
@@ -318,10 +453,11 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, () => {
     console.log(`====================================================`);
-    console.log(`🚀 MeshRoute Backend running on port ${PORT} (0.0.0.0)`);
+    console.log(`🚀 MeshRoute Backend running on port ${PORT} (dual-stack IPv4 & IPv6)`);
     console.log(`   Local Check : http://localhost:${PORT}/health`);
+    console.log(`   Localhost IP: http://127.0.0.1:${PORT}/dashboard`);
     console.log(`   Dashboard   : http://localhost:${PORT}/dashboard`);
     console.log(`   Phone Endpoint: http://10.173.133.62:${PORT}/api/sos`);
     console.log(`   AES-256-GCM emergency key active for authorized decryption`);

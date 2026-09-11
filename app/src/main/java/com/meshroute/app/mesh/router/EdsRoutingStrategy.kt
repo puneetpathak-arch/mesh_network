@@ -100,7 +100,7 @@ class EdsRoutingStrategy(
 
         val adaptiveThreshold = calculateAdaptiveThreshold(packet)
 
-        return neighbors.map { peer ->
+        val decisions = neighbors.map { peer ->
             val inHopPath = packet.hopPath.contains(peer.nodeId)
             if (inHopPath || peer.nodeId == context.selfNodeId) {
                 return@map ForwardingDecision(
@@ -131,5 +131,24 @@ class EdsRoutingStrategy(
                 shouldForward = shouldForward
             )
         }
+
+        // Anti-starvation fallback: if eligible peers are present but none met the threshold,
+        // forward to the highest-scoring candidate to guarantee off-grid SOS propagation.
+        val validDecisions = decisions.filter { !it.shouldForward && !packet.hopPath.contains(it.peer.nodeId) && it.peer.nodeId != context.selfNodeId }
+        if (decisions.none { it.shouldForward } && validDecisions.isNotEmpty()) {
+            val bestCandidate = validDecisions.maxByOrNull { it.score }
+            if (bestCandidate != null) {
+                return decisions.map { d ->
+                    if (d.peer.nodeId == bestCandidate.peer.nodeId) {
+                        d.copy(
+                            shouldForward = true,
+                            reason = "Forwarded via Anti-Starvation Fallback (Best Available Candidate EDS ${d.score})"
+                        )
+                    } else d
+                }
+            }
+        }
+
+        return decisions
     }
 }

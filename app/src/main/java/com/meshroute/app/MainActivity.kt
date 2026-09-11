@@ -27,12 +27,14 @@ import com.meshroute.app.mesh.ble.BleMeshTransport
 import com.meshroute.app.mesh.router.*
 import com.meshroute.app.mesh.transport.LocationData
 import com.meshroute.app.mesh.transport.SosPacket
+import com.meshroute.app.service.MeshForegroundService
 import com.meshroute.app.service.SosNotificationHelper
 import com.meshroute.app.ui.screens.MainSosScreen
 import com.meshroute.app.ui.screens.NetworkDetailsScreen
 import com.meshroute.app.ui.theme.DarkBackground
 import com.meshroute.app.ui.theme.MeshRouteTheme
 import kotlinx.coroutines.launch
+import android.util.Log
 import java.util.*
 
 enum class AppScreen {
@@ -152,8 +154,8 @@ fun MeshRouteApp(
     }
 
     var senderName by remember { mutableStateOf(prefs.getString("user_profile_name", "Puneet P.") ?: "Puneet P.") }
-    var medicalNotes by remember { mutableStateOf(prefs.getString("user_medical_notes", "Sprained ankle, low water") ?: "Sprained ankle, low water") }
-    var selectedReachHops by remember { mutableIntStateOf(8) } // Default 8 hops
+    var medicalNotes by remember { mutableStateOf(prefs.getString("user_medical_notes", "Sprained ankle") ?: "Sprained ankle") }
+    var selectedReachHops by remember { mutableIntStateOf(12) } // Default 12 hops as in mockup
     var currentLocation by remember { mutableStateOf<LocationData?>(null) }
     var isFetchingLocation by remember { mutableStateOf(false) }
     var isBroadcasting by remember { mutableStateOf(false) }
@@ -274,13 +276,15 @@ fun MeshRouteApp(
                     coroutineScope.launch {
                         isBroadcasting = true
                         val loc = locationProvider.getCurrentLocation(2000L) ?: currentLocation
-                        router.originateSos(
+                        val packet = router.originateSos(
                             message = sosMessageText,
                             location = loc,
                             senderName = senderName,
                             medicalInfo = medicalNotes,
                             ttl = selectedReachHops
                         )
+                        // Trigger immediate high-priority local emergency notification
+                        SosNotificationHelper.showSosNotification(activity, packet)
                         gatewayUploader.triggerUpload()
                         isBroadcasting = false
                     }

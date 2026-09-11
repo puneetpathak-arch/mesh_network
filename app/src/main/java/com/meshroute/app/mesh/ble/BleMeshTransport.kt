@@ -21,8 +21,8 @@ class BleMeshTransport(
     companion object {
         private const val TAG = "BleMeshTransport"
         private const val CHUNK_HEADER_MAGIC: Byte = 0xBE.toByte()
-        /** Conservative fallback if MTU negotiation fails or is not yet complete. */
-        private const val DEFAULT_MTU = 23
+        /** Default MTU used for single-packet transmission framing. */
+        private const val DEFAULT_MTU = BleConstants.MAX_MTU
         /** ATT protocol overhead per write (1 opcode + 2 handle bytes). */
         private const val ATT_HEADER_BYTES = 3
     }
@@ -147,12 +147,29 @@ class BleMeshTransport(
     }
 
     private val chunkAssemblyMap = ConcurrentHashMap<String, MutableMap<Int, ByteArray>>()
+    private val preparedWritesMap = ConcurrentHashMap<String, java.io.ByteArrayOutputStream>()
 
     // ─── GATT Server Callback ───────────────────────────────────
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             Log.d(TAG, "GATT Server ConnectionStateChange device: ${device.address} status: $status newState: $newState")
+            if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                preparedWritesMap.remove(device.address)
+            }
+        }
+
+        override fun onExecuteWrite(device: BluetoothDevice, requestId: Int, execute: Boolean) {
+            if (execute) {
+                val stream = preparedWritesMap.remove(device.address)
+                val fullData = stream?.toByteArray()
+                if (fullData != null && fullData.isNotEmpty()) {
+                    deliverInboundPayload(device, fullData)
+                }
+            } else {
+                preparedWritesMap.remove(device.address)
+            }
+            gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
         }
 
         override fun onCharacteristicWriteRequest(
@@ -165,45 +182,16 @@ class BleMeshTransport(
             value: ByteArray?
         ) {
             if (characteristic.uuid == BleConstants.CHAR_PACKET_WRITE_UUID && value != null) {
-                val senderId = deviceAddressToNodeId[device.address] ?: device.address
-                Log.d(TAG, "Received ${value.size} bytes from $senderId via GATT Write")
-
-                val fullPayload: ByteArray? = if (value.size >= 4 && value[0] == CHUNK_HEADER_MAGIC) {
-                    val packetHash = value[1]
-                    val chunkIdx = value[2].toInt() and 0xFF
-                    val totalChunks = value[3].toInt() and 0xFF
-                    val payload = value.copyOfRange(4, value.size)
-                    val key = "${device.address}_$packetHash"
-
-                    val map = chunkAssemblyMap.computeIfAbsent(key) { ConcurrentHashMap() }
-                    map[chunkIdx] = payload
-
-                    if (map.size == totalChunks) {
-                        chunkAssemblyMap.remove(key)
-                        val assembled = java.io.ByteArrayOutputStream()
-                        for (i in 0 until totalChunks) {
-                            map[i]?.let { assembled.write(it) }
-                        }
-                        assembled.toByteArray()
-                    } else {
-                        null // Still waiting for remaining chunks
+                if (preparedWrite) {
+                    val stream = preparedWritesMap.computeIfAbsent(device.address) { java.io.ByteArrayOutputStream() }
+                    stream.write(value)
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
                     }
-                } else {
-                    value // Raw / legacy packet format
+                    return
                 }
 
-                if (fullPayload != null) {
-                    scope.launch {
-                        _inbound.emit(
-                            InboundPacket(
-                                data = fullPayload,
-                                senderNodeId = senderId,
-                                transportType = TransportType.BLE,
-                                receivedTimestamp = System.currentTimeMillis()
-                            )
-                        )
-                    }
-                }
+                deliverInboundPayload(device, value)
 
                 if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
@@ -212,6 +200,48 @@ class BleMeshTransport(
                 if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
                 }
+            }
+        }
+    }
+
+    private fun deliverInboundPayload(device: BluetoothDevice, value: ByteArray) {
+        val senderId = deviceAddressToNodeId[device.address] ?: device.address
+        Log.d(TAG, "Received ${value.size} bytes from $senderId via GATT Write")
+
+        val fullPayload: ByteArray? = if (value.size >= 4 && value[0] == CHUNK_HEADER_MAGIC) {
+            val packetHash = value[1]
+            val chunkIdx = value[2].toInt() and 0xFF
+            val totalChunks = value[3].toInt() and 0xFF
+            val payload = value.copyOfRange(4, value.size)
+            val key = "${device.address}_$packetHash"
+
+            val map = chunkAssemblyMap.computeIfAbsent(key) { ConcurrentHashMap() }
+            map[chunkIdx] = payload
+
+            if (map.size == totalChunks) {
+                chunkAssemblyMap.remove(key)
+                val assembled = java.io.ByteArrayOutputStream()
+                for (i in 0 until totalChunks) {
+                    map[i]?.let { assembled.write(it) }
+                }
+                assembled.toByteArray()
+            } else {
+                null // Still waiting for remaining chunks
+            }
+        } else {
+            value // Raw / legacy packet format
+        }
+
+        if (fullPayload != null) {
+            scope.launch {
+                _inbound.emit(
+                    InboundPacket(
+                        data = fullPayload,
+                        senderNodeId = senderId,
+                        transportType = TransportType.BLE,
+                        receivedTimestamp = System.currentTimeMillis()
+                    )
+                )
             }
         }
     }
@@ -251,6 +281,7 @@ class BleMeshTransport(
         deviceAddressToNodeId.clear()
         nodeIdToDeviceAddress.clear()
         chunkAssemblyMap.clear()
+        preparedWritesMap.clear()
         _neighbors.value = emptySet()
 
         scope.coroutineContext.cancelChildren()
@@ -454,20 +485,34 @@ class BleMeshTransport(
             var gattClient: BluetoothGatt? = null
             var writeCharRef: BluetoothGattCharacteristic? = null
             var serviceDiscoveryStarted = false
-            // Track the actual negotiated MTU; fall back to BLE default (23) if negotiation fails.
             var negotiatedMtu = DEFAULT_MTU
+
+            fun startServicesDiscovery(gatt: BluetoothGatt) {
+                if (serviceDiscoveryStarted) return
+                serviceDiscoveryStarted = true
+                if (chunks.isEmpty()) {
+                    chunks = fragmentData(data, negotiatedMtu)
+                }
+                gatt.discoverServices()
+            }
 
             val gattCallback = object : BluetoothGattCallback() {
                 override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
-                        Log.d(TAG, "GATT Client connected to ${peer.nodeId}, requesting MTU...")
-                        val mtuOk = gatt.requestMtu(BleConstants.MAX_MTU)
-                        if (!mtuOk && !serviceDiscoveryStarted) {
-                            // MTU request not supported; proceed with default MTU.
-                            Log.w(TAG, "requestMtu() returned false for ${peer.nodeId}, using default MTU $negotiatedMtu")
-                            chunks = fragmentData(data, negotiatedMtu)
-                            serviceDiscoveryStarted = true
-                            gatt.discoverServices()
+                        Log.d(TAG, "GATT Client connected to ${peer.nodeId}")
+                        scope.launch {
+                            delay(150L) // Allow connection handshake to stabilize
+                            if (!continuation.isActive) return@launch
+
+                            Log.d(TAG, "Requesting MTU ${BleConstants.MAX_MTU} for ${peer.nodeId}...")
+                            val mtuOk = runCatching { gatt.requestMtu(BleConstants.MAX_MTU) }.getOrDefault(false)
+
+                            // Fallback watchdog: if onMtuChanged does not fire within 350ms, discover services anyway
+                            delay(350L)
+                            if (!serviceDiscoveryStarted && continuation.isActive) {
+                                Log.w(TAG, "MTU callback not received for ${peer.nodeId} (mtuOk=$mtuOk), proceeding to discoverServices")
+                                startServicesDiscovery(gatt)
+                            }
                         }
                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                         gatt.close()
@@ -478,14 +523,10 @@ class BleMeshTransport(
                 }
 
                 override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-                    // Capture the actual negotiated MTU and fragment using it.
-                    negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else DEFAULT_MTU
+                    negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS && mtu > 23) mtu else BleConstants.MAX_MTU
                     Log.d(TAG, "GATT MTU negotiated to $negotiatedMtu for ${peer.nodeId}, discovering services...")
                     chunks = fragmentData(data, negotiatedMtu)
-                    if (!serviceDiscoveryStarted) {
-                        serviceDiscoveryStarted = true
-                        gatt.discoverServices()
-                    }
+                    startServicesDiscovery(gatt)
                 }
 
                 override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
@@ -495,13 +536,12 @@ class BleMeshTransport(
                         writeCharRef = writeChar
 
                         if (writeChar != null) {
-                            // Ensure chunks are built even if onMtuChanged was never called.
                             if (chunks.isEmpty()) {
                                 Log.w(TAG, "Chunks not yet built for ${peer.nodeId}; using current negotiatedMtu=$negotiatedMtu")
                                 chunks = fragmentData(data, negotiatedMtu)
                             }
                             scope.launch {
-                                delay(200L)
+                                delay(150L)
                                 currentChunkIndex = 0
                                 Log.d(TAG, "Sending ${chunks.size} chunk(s) to ${peer.nodeId} (MTU=$negotiatedMtu, chunk frames: ${chunks.map { it.size }} bytes)")
                                 val writeSuccess = attemptWrite(gatt, writeChar, chunks[0], peer.nodeId)

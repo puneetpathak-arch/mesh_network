@@ -21,6 +21,7 @@
       --amber-warning: #F59E0B;
       --amber-subtle: rgba(245, 158, 11, 0.18);
       --blue-sky: #38BDF8;
+      --blue-subtle: rgba(56, 189, 248, 0.18);
       --text-primary: #F8FAFC;
       --text-secondary: #94A3B8;
       --text-muted: #64748B;
@@ -42,16 +43,36 @@
       overflow: hidden;
     }
 
+    /* ─── Notice Banner for file:// users ─── */
+    #protocol-notice {
+      display: none;
+      background: linear-gradient(90deg, #1E3A8A, #1D4ED8);
+      color: #EFF6FF;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 16px;
+      text-align: center;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    #protocol-notice a {
+      color: #93C5FD;
+      font-weight: 700;
+      text-decoration: underline;
+    }
+
     /* ─── Top Navigation Header ─── */
     header {
       background-color: var(--surface-dark);
       border-bottom: 1px solid var(--border-dark);
-      padding: 12px 24px;
+      padding: 10px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       height: 64px;
       flex-shrink: 0;
+      gap: 16px;
     }
 
     .brand {
@@ -78,6 +99,9 @@
       font-size: 16px;
       font-weight: 700;
       color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .brand-subtitle {
@@ -85,17 +109,23 @@
       color: var(--text-secondary);
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .header-stats {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 12px;
     }
 
     .stat-pill {
       background-color: var(--surface-card);
       border: 1px solid var(--border-dark);
       border-radius: 8px;
-      padding: 6px 14px;
+      padding: 6px 12px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -109,25 +139,60 @@
       color: var(--red-emergency);
     }
 
+    /* Live Status Pill with Dynamic States */
     .live-pulse-wrapper {
       display: flex;
       align-items: center;
       gap: 6px;
       font-size: 11px;
       font-weight: 600;
-      color: var(--green-emerald);
-      padding: 4px 10px;
-      background: var(--green-subtle);
+      padding: 5px 12px;
       border-radius: 20px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .live-pulse-wrapper.status-online {
+      color: var(--green-emerald);
+      background: var(--green-subtle);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .live-pulse-wrapper.status-offline {
+      color: var(--red-emergency);
+      background: var(--red-subtle);
+      border: 1px solid rgba(255, 69, 58, 0.4);
+    }
+
+    .live-pulse-wrapper.status-connecting {
+      color: var(--amber-warning);
+      background: var(--amber-subtle);
+      border: 1px solid rgba(245, 158, 11, 0.3);
     }
 
     .live-dot {
       width: 8px;
       height: 8px;
-      background-color: var(--green-emerald);
       border-radius: 50%;
+    }
+
+    .status-online .live-dot {
+      background-color: var(--green-emerald);
       box-shadow: 0 0 8px var(--green-emerald);
       animation: pulse-green 1.5s infinite;
+    }
+
+    .status-offline .live-dot {
+      background-color: var(--red-emergency);
+      box-shadow: 0 0 8px var(--red-emergency);
+      animation: pulse-red 1s infinite;
+    }
+
+    .status-connecting .live-dot {
+      background-color: var(--amber-warning);
+      box-shadow: 0 0 8px var(--amber-warning);
+      animation: pulse-amber 1.2s infinite;
     }
 
     @keyframes pulse-green {
@@ -136,12 +201,70 @@
       100% { transform: scale(0.95); opacity: 0.8; }
     }
 
+    @keyframes pulse-red {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.4); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    @keyframes pulse-amber {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      outline: none;
+    }
+
+    .btn-simulate {
+      background: linear-gradient(135deg, #FF453A, #D32F2F);
+      color: white;
+      box-shadow: 0 2px 10px rgba(255, 69, 58, 0.35);
+    }
+    .btn-simulate:hover {
+      background: linear-gradient(135deg, #FF5C52, #E53935);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(255, 69, 58, 0.5);
+    }
+    .btn-simulate:active {
+      transform: translateY(0);
+    }
+
+    .btn-ghost {
+      background-color: var(--surface-card);
+      border-color: var(--border-dark);
+      color: var(--text-secondary);
+    }
+    .btn-ghost:hover {
+      color: var(--text-primary);
+      border-color: var(--blue-sky);
+    }
+
+    .btn-icon {
+      padding: 6px 9px;
+      font-size: 14px;
+    }
+
     /* ─── Main Content Layout ─── */
     main {
       display: flex;
       flex: 1;
       height: calc(100vh - 64px);
       overflow: hidden;
+      position: relative;
     }
 
     #map-container {
@@ -155,9 +278,42 @@
       height: 100%;
     }
 
+    /* Floating map overlay controls */
+    .map-controls-overlay {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .map-btn {
+      background-color: rgba(19, 29, 49, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-dark);
+      color: var(--text-primary);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .map-btn:hover {
+      border-color: var(--blue-sky);
+      background-color: rgba(24, 36, 60, 0.95);
+      color: white;
+    }
+
     /* ─── Sidebar ─── */
     sidebar {
-      width: 420px;
+      width: 430px;
       background-color: var(--surface-dark);
       border-left: 1px solid var(--border-dark);
       display: flex;
@@ -166,7 +322,7 @@
     }
 
     .sidebar-header {
-      padding: 16px 20px;
+      padding: 14px 18px;
       border-bottom: 1px solid var(--border-dark);
       display: flex;
       justify-content: space-between;
@@ -179,15 +335,69 @@
       color: var(--text-secondary);
       letter-spacing: 0.8px;
       text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Sidebar Toolbar */
+    .sidebar-toolbar {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-dark);
+      background-color: rgba(10, 15, 29, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-input {
+      width: 100%;
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 12px;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--blue-sky);
+    }
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+    }
+    .filter-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-dark);
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .filter-pill.active {
+      background-color: var(--blue-sky);
+      color: #0A0F1D;
+      border-color: var(--blue-sky);
     }
 
     .feed-container {
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     .feed-container::-webkit-scrollbar {
@@ -203,7 +413,7 @@
       background-color: var(--surface-card);
       border: 1px solid var(--border-dark);
       border-radius: 12px;
-      padding: 14px;
+      padding: 13px;
       cursor: pointer;
       transition: all 0.2s ease;
       position: relative;
@@ -213,7 +423,12 @@
     .sos-card:hover {
       border-color: var(--blue-sky);
       transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .sos-card.active-selected {
+      border-color: var(--red-emergency);
+      box-shadow: 0 0 12px rgba(255, 69, 58, 0.4);
     }
 
     .sos-card.highlight-new {
@@ -221,8 +436,8 @@
     }
 
     @keyframes highlight-border {
-      0% { border-color: var(--red-emergency); box-shadow: 0 0 20px rgba(255, 69, 58, 0.6); }
-      100% { border-color: var(--border-dark); box-shadow: none; }
+      0% { border-color: var(--red-emergency); box-shadow: 0 0 20px rgba(255, 69, 58, 0.8); background-color: rgba(255, 69, 58, 0.08); }
+      100% { border-color: var(--border-dark); box-shadow: none; background-color: var(--surface-card); }
     }
 
     .card-top {
@@ -238,7 +453,7 @@
     }
 
     .sender-name {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
       color: var(--text-primary);
     }
@@ -271,13 +486,13 @@
     }
 
     .emergency-text {
-      font-size: 13px;
+      font-size: 12.5px;
       color: #E2E8F0;
       background-color: rgba(0, 0, 0, 0.25);
       border-left: 3px solid var(--red-emergency);
-      padding: 8px 10px;
+      padding: 7px 10px;
       border-radius: 4px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       line-height: 1.4;
     }
 
@@ -292,7 +507,7 @@
       border: 1px solid rgba(255, 69, 58, 0.3);
       padding: 4px 8px;
       border-radius: 6px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .card-footer {
@@ -307,7 +522,7 @@
 
     .badges {
       display: flex;
-      gap: 6px;
+      gap: 5px;
     }
 
     .mini-badge {
@@ -369,10 +584,11 @@
       color: #F1F5F9;
     }
     .popup-meta {
-      font-size: 10px;
+      font-size: 11px;
       color: var(--text-muted);
       border-top: 1px solid var(--border-dark);
       padding-top: 6px;
+      line-height: 1.5;
     }
 
     .empty-state {
@@ -381,10 +597,26 @@
       color: var(--text-muted);
       font-size: 13px;
       line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .empty-icon {
+      font-size: 32px;
+      opacity: 0.6;
     }
   </style>
 </head>
 <body>
+
+  <!-- Notice for file:// viewers -->
+  <div id="protocol-notice">
+    <span>💡 Tip: You are viewing this file via file://. For full live synchronization, open:</span>
+    <a href="http://localhost:3000/dashboard" target="_blank">http://localhost:3000/dashboard</a>
+    <button onclick="document.getElementById('protocol-notice').style.display='none'" style="background:none;border:none;color:white;cursor:pointer;margin-left:8px;">✕</button>
+  </div>
 
   <header>
     <div class="brand">
@@ -398,14 +630,30 @@
       </div>
     </div>
 
-    <div class="header-stats">
-      <div class="stat-pill">
-        <span>Received SOS Packets:</span>
-        <span class="count" id="total-sos-count">0</span>
-      </div>
-      <div class="live-pulse-wrapper">
-        <div class="live-dot"></div>
-        <span>GATEWAY ONLINE</span>
+    <div class="header-actions">
+      <button id="btn-simulate-top" class="btn btn-simulate" title="Inject simulated emergency packet">
+        <span>⚡</span>
+        <span>Simulate SOS Packet</span>
+      </button>
+
+      <button id="btn-sound-toggle" class="btn btn-ghost btn-icon" title="Toggle sound alerts">
+        <span id="sound-icon">🔔</span>
+      </button>
+
+      <button id="btn-clear-feed" class="btn btn-ghost btn-icon" title="Clear all stored incidents">
+        <span>🗑️</span>
+      </button>
+
+      <div class="header-stats">
+        <div class="stat-pill" title="Total unique emergency packets ingested">
+          <span>Received SOS:</span>
+          <span class="count" id="total-sos-count">0</span>
+        </div>
+
+        <div class="live-pulse-wrapper status-connecting" id="connection-badge" title="Click to test connection">
+          <div class="live-dot"></div>
+          <span id="connection-status-text">CONNECTING...</span>
+        </div>
       </div>
     </div>
   </header>
@@ -413,17 +661,47 @@
   <main>
     <div id="map-container">
       <div id="map"></div>
+
+      <!-- Floating Map Control Bar -->
+      <div class="map-controls-overlay">
+        <button id="btn-fit-all" class="map-btn" title="Zoom to fit all active SOS markers">
+          <span>🎯</span> Fit All SOS Pins
+        </button>
+        <button id="btn-center-default" class="map-btn" title="Reset view to default station coordinates">
+          <span>🧭</span> Recenter Station
+        </button>
+      </div>
     </div>
 
     <sidebar>
       <div class="sidebar-header">
-        <span class="sidebar-title">Live SOS Ingestion Feed</span>
-        <span id="feed-status" style="font-size: 11px; color: var(--text-muted);">Polling 2.5s</span>
+        <span class="sidebar-title">
+          <span>📡</span>
+          <span>Live SOS Feed</span>
+        </span>
+        <span id="feed-status" style="font-size: 11px; color: var(--text-muted);">Syncing...</span>
       </div>
+
+      <div class="sidebar-toolbar">
+        <input type="text" id="feed-search" class="search-input" placeholder="Search hiker, message, ID..." />
+        <div class="filter-pills">
+          <button class="filter-pill active" data-filter="all">All</button>
+          <button class="filter-pill" data-filter="medical">⚕️ Medical Only</button>
+          <button class="filter-pill" data-filter="ier">IER (EDS)</button>
+          <button class="filter-pill" data-filter="epidemic">Epidemic</button>
+        </div>
+      </div>
+
       <div class="feed-container" id="sos-feed">
-        <div class="empty-state">
-          No SOS emergency packets received yet.<br>
-          Packets routed via nearby smartphones to this gateway will appear live on the map.
+        <div class="empty-state" id="empty-state-view">
+          <div class="empty-icon">📡</div>
+          <div>
+            <strong>No SOS emergency packets received yet.</strong><br>
+            Packets relayed peer-to-peer via nearby Android devices will appear live on this radar.
+          </div>
+          <button id="btn-simulate-empty" class="btn btn-simulate">
+            <span>⚡</span> Simulate First Emergency Packet
+          </button>
         </div>
       </div>
     </sidebar>
@@ -431,36 +709,47 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Initialize Map with Dark Matter tiles
-    const map = L.map('map', { zoomControl: true }).setView([36.1069, -112.1129], 6);
-
-    // ─── Map Tile Configuration ───
-    // If you have an API key from carto.com/basemaps/apikey, paste it here:
-    const CARTO_API_KEY = ''; 
-
-    if (CARTO_API_KEY) {
-      // Use Carto Dark Matter with your personal API key
-      L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${CARTO_API_KEY}`, {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a> | MeshRoute Rescue System',
-        maxZoom: 19
-      }).addTo(map);
-    } else {
-      // Default: Official Esri World Dark Gray Canvas (100% Free, NO watermark, NO API key required)
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; MeshRoute Emergency Rescue',
-        maxZoom: 16
-      }).addTo(map);
-      // Dark reference overlay (boundaries, roads, place labels)
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-        attribution: '',
-        maxZoom: 16
-      }).addTo(map);
+    // ─── Adaptive Gateway Endpoint Resolution ───
+    const isFileProto = (window.location.protocol === 'file:');
+    if (isFileProto) {
+      const notice = document.getElementById('protocol-notice');
+      if (notice) notice.style.display = 'flex';
     }
+
+    let resolvedApiBase = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
+      ? window.location.origin
+      : 'http://127.0.0.1:3000';
+
+    const CANDIDATES = [
+      (window.location.protocol === 'http:' || window.location.protocol === 'https:') ? window.location.origin : '',
+      'http://127.0.0.1:3000',
+      'http://localhost:3000',
+      ''
+    ].filter(Boolean);
+
+    // ─── Initialize Map with Esri Dark Gray Base + Reference Overlay ───
+    const DEFAULT_COORDS = [36.1069, -112.1129];
+    const map = L.map('map', { zoomControl: true }).setView(DEFAULT_COORDS, 7);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri &mdash; MeshRoute Emergency Rescue System',
+      maxZoom: 16
+    }).addTo(map);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '',
+      maxZoom: 16
+    }).addTo(map);
 
     const markerGroup = L.featureGroup().addTo(map);
     const markersMap = new Map();
+    const cardElementsMap = new Map();
     const seenEventIds = new Set();
+    let allEvents = [];
+    let activeFilter = 'all';
+    let searchQuery = '';
     let isInitialLoad = true;
+    let soundEnabled = true;
 
     // Custom glowing pulsing HTML marker
     const pulseIcon = L.divIcon({
@@ -471,21 +760,72 @@
       popupAnchor: [0, -12]
     });
 
+    // ─── Web Audio API Radar Chime ───
+    let audioCtx = null;
+    function playEmergencyPing() {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.exponentialRampToValueAtTime(440, now + 0.35);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.36);
+      } catch (_) {}
+    }
+
+    // ─── Relative Time Formatter ───
     function formatTime(timestamp) {
       if (!timestamp) return 'Just now';
-      const deltaSec = Math.floor((Date.now() - timestamp) / 1000);
+      const deltaSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
       if (deltaSec < 60) return `${deltaSec}s ago`;
       const deltaMin = Math.floor(deltaSec / 60);
       if (deltaMin < 60) return `${deltaMin}m ago`;
       return new Date(timestamp).toLocaleTimeString();
     }
 
-    function renderFeedCard(event, isNew = false) {
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.innerText = String(str);
+      return div.innerHTML;
+    }
+
+    // ─── Connection Status Updater ───
+    const connBadge = document.getElementById('connection-badge');
+    const connText = document.getElementById('connection-status-text');
+
+    function setConnectionStatus(status, text) {
+      connBadge.className = `live-pulse-wrapper status-${status}`;
+      connText.textContent = text;
+    }
+
+    connBadge.addEventListener('click', () => {
+      fetchEvents(true);
+    });
+
+    // ─── Create Feed Card ───
+    function createFeedCard(event, isNew = false) {
       const card = document.createElement('div');
       card.className = `sos-card ${isNew ? 'highlight-new' : ''}`;
       card.id = `card-${event.messageId}`;
 
-      // Strategy determination (Phase 4 polish)
       const isIer = event.routingStrategy ? event.routingStrategy.includes('IER') : (event.hopCount > 1);
       const strategyClass = isIer ? 'strategy-ier' : 'strategy-epidemic';
       const strategyLabel = isIer ? 'IER (EDS)' : 'Epidemic';
@@ -514,26 +854,29 @@
           <div class="badges">
             <span class="mini-badge">Hops: ${event.hopCount ?? 0}</span>
             <span class="mini-badge">TTL: ${event.ttl ?? 8}</span>
-            ${event.lat && event.lon ? `<span class="mini-badge">${event.lat.toFixed(4)}, ${event.lon.toFixed(4)}</span>` : ''}
+            ${(event.lat != null && event.lon != null) ? `<span class="mini-badge">${Number(event.lat).toFixed(4)}, ${Number(event.lon).toFixed(4)}</span>` : ''}
           </div>
-          <span>${formatTime(event.receivedAt)}</span>
+          <span class="card-time" id="time-${event.messageId}">${formatTime(event.receivedAt)}</span>
         </div>
       `;
 
       card.addEventListener('click', () => {
-        if (event.lat && event.lon) {
+        if (event.lat != null && event.lon != null) {
           map.flyTo([event.lat, event.lon], 13, { duration: 1.2 });
           const marker = markersMap.get(event.messageId);
           if (marker) marker.openPopup();
+          
+          document.querySelectorAll('.sos-card').forEach(c => c.classList.remove('active-selected'));
+          card.classList.add('active-selected');
         }
       });
 
       return card;
     }
 
+    // ─── Update Map Marker ───
     function updateMapMarker(event) {
-      if (!event.lat || !event.lon) return;
-
+      if (event.lat == null || event.lon == null) return;
       if (markersMap.has(event.messageId)) return;
 
       const isIer = event.routingStrategy ? event.routingStrategy.includes('IER') : (event.hopCount > 1);
@@ -546,9 +889,9 @@
           ${event.medicalNote ? `<div style="font-size:11px;color:#FF453A;margin-bottom:6px;"><strong>Medical:</strong> ${escapeHtml(event.medicalNote)}</div>` : ''}
           <div class="popup-meta">
             Routing: <strong>${strategyLabel}</strong><br>
-            Hops Traversed: ${event.hopCount} | Remaining TTL: ${event.ttl}<br>
-            GPS: ${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}<br>
-            <a href="https://maps.google.com/?q=${event.lat},${event.lon}" target="_blank" style="color:#38BDF8;text-decoration:none;display:inline-block;margin-top:4px;">View on Google Maps ↗</a>
+            Hops Traversed: ${event.hopCount ?? 0} | Remaining TTL: ${event.ttl ?? 8}<br>
+            GPS: ${Number(event.lat).toFixed(5)}, ${Number(event.lon).toFixed(5)}<br>
+            <a href="https://maps.google.com/?q=${event.lat},${event.lon}" target="_blank" style="color:#38BDF8;text-decoration:none;display:inline-block;margin-top:4px;">Open in Google Maps ↗</a>
           </div>
         </div>
       `;
@@ -560,86 +903,311 @@
       markersMap.set(event.messageId, marker);
     }
 
+    // ─── Filter Logic ───
+    function matchesFilter(event) {
+      if (activeFilter === 'medical' && (!event.medicalNote || event.medicalNote === 'None')) {
+        return false;
+      }
+      if (activeFilter === 'ier') {
+        const isIer = event.routingStrategy ? event.routingStrategy.includes('IER') : (event.hopCount > 1);
+        if (!isIer) return false;
+      }
+      if (activeFilter === 'epidemic') {
+        const isIer = event.routingStrategy ? event.routingStrategy.includes('IER') : (event.hopCount > 1);
+        if (isIer) return false;
+      }
+
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const sName = (event.senderName || '').toLowerCase();
+        const msg = (event.message || '').toLowerCase();
+        const mId = (event.messageId || '').toLowerCase();
+        const med = (event.medicalNote || '').toLowerCase();
+        return sName.includes(q) || msg.includes(q) || mId.includes(q) || med.includes(q);
+      }
+
+      return true;
+    }
+
+    // ─── Non-destructive Dashboard Update Routine ───
     function updateDashboard(events) {
+      allEvents = Array.isArray(events) ? events : [];
       const countEl = document.getElementById('total-sos-count');
       const feedContainer = document.getElementById('sos-feed');
+      const emptyState = document.getElementById('empty-state-view');
 
-      countEl.textContent = events.length;
+      countEl.textContent = allEvents.length;
 
-      if (events.length === 0) {
-        feedContainer.innerHTML = `
-          <div class="empty-state">
-            No SOS emergency packets received yet.<br>
-            Packets routed via nearby smartphones to this gateway will appear live on the map.
-          </div>
-        `;
+      if (allEvents.length === 0) {
+        markerGroup.clearLayers();
+        markersMap.clear();
+        cardElementsMap.clear();
+        seenEventIds.clear();
+        feedContainer.innerHTML = '';
+        if (emptyState) feedContainer.appendChild(emptyState);
         return;
       }
 
-      let hasNewMarkers = false;
-      feedContainer.innerHTML = '';
+      if (emptyState && emptyState.parentElement) {
+        emptyState.remove();
+      }
 
-      events.forEach(event => {
+      let hasNewMarkers = false;
+      const currentIds = new Set(allEvents.map(e => e.messageId));
+
+      for (const [id, el] of cardElementsMap.entries()) {
+        if (!currentIds.has(id)) {
+          el.remove();
+          cardElementsMap.delete(id);
+          const marker = markersMap.get(id);
+          if (marker) {
+            markerGroup.removeLayer(marker);
+            markersMap.delete(id);
+          }
+        }
+      }
+
+      allEvents.forEach((event, idx) => {
         const isNew = !seenEventIds.has(event.messageId);
         if (isNew) {
           seenEventIds.add(event.messageId);
           hasNewMarkers = true;
+          if (!isInitialLoad) {
+            playEmergencyPing();
+          }
         }
 
         updateMapMarker(event);
-        feedContainer.appendChild(renderFeedCard(event, isNew && !isInitialLoad));
+
+        const passesFilter = matchesFilter(event);
+
+        if (!cardElementsMap.has(event.messageId)) {
+          const cardEl = createFeedCard(event, isNew && !isInitialLoad);
+          cardEl.style.display = passesFilter ? 'block' : 'none';
+          cardElementsMap.set(event.messageId, cardEl);
+
+          const existingCards = feedContainer.children;
+          if (idx < existingCards.length) {
+            feedContainer.insertBefore(cardEl, existingCards[idx]);
+          } else {
+            feedContainer.appendChild(cardEl);
+          }
+        } else {
+          const cardEl = cardElementsMap.get(event.messageId);
+          cardEl.style.display = passesFilter ? 'block' : 'none';
+          const timeEl = cardEl.querySelector(`#time-${CSS.escape(event.messageId)}`);
+          if (timeEl) {
+            timeEl.textContent = formatTime(event.receivedAt);
+          }
+        }
       });
 
-      // Auto-fit bounds (Phase 4 polish)
       if (hasNewMarkers && markerGroup.getLayers().length > 0) {
         if (isInitialLoad || markerGroup.getLayers().length <= 3) {
-          map.fitBounds(markerGroup.getBounds().pad(0.2));
+          try {
+            map.fitBounds(markerGroup.getBounds().pad(0.2));
+          } catch (_) {}
         }
       }
 
       isInitialLoad = false;
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.innerText = str;
-      return div.innerHTML;
+    // ─── Filter & Search Handlers ───
+    function refreshFilters() {
+      allEvents.forEach(event => {
+        const cardEl = cardElementsMap.get(event.messageId);
+        if (cardEl) {
+          cardEl.style.display = matchesFilter(event) ? 'block' : 'none';
+        }
+      });
     }
 
-    // ─── Polling Routine (Phase 2 & 3) ───
-    async function fetchEvents() {
+    document.querySelectorAll('.filter-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilter = btn.dataset.filter;
+        refreshFilters();
+      });
+    });
+
+    const searchInput = document.getElementById('feed-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.trim();
+        refreshFilters();
+      });
+    }
+
+    // ─── Map Controls ───
+    document.getElementById('btn-fit-all').addEventListener('click', () => {
+      if (markerGroup.getLayers().length > 0) {
+        map.fitBounds(markerGroup.getBounds().pad(0.25));
+      } else {
+        map.flyTo(DEFAULT_COORDS, 7);
+      }
+    });
+
+    document.getElementById('btn-center-default').addEventListener('click', () => {
+      map.flyTo(DEFAULT_COORDS, 7, { duration: 1 });
+    });
+
+    // ─── Sound Toggle ───
+    const soundToggleBtn = document.getElementById('btn-sound-toggle');
+    const soundIcon = document.getElementById('sound-icon');
+    soundToggleBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundIcon.textContent = soundEnabled ? '🔔' : '🔕';
+      if (soundEnabled) {
+        playEmergencyPing();
+      }
+    });
+
+    // ─── Simulate Emergency Packet Action ───
+    async function triggerSimulation() {
       try {
-        const res = await fetch('/api/sos-events');
+        const res = await fetch(`${resolvedApiBase}/api/sos/simulate`, { 
+          method: 'POST',
+          mode: 'cors'
+        });
         if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.events)) {
-            updateDashboard(data.events);
-          }
+          fetchEvents();
+        } else {
+          simulateLocalPacket();
         }
       } catch (err) {
-        console.warn('Polling error:', err);
+        console.warn('Simulate API error, fallback to local packet:', err);
+        simulateLocalPacket();
+      }
+    }
+
+    function simulateLocalPacket() {
+      const sampleHikers = ['Maya Lin', 'Carlos Vega', 'Liam O\'Connor', 'Samantha Ray', 'Aiden Zhao'];
+      const sampleMsgs = [
+        'Stranded off-trail at Colorado River bend, lost navigation aid.',
+        'Rockfall incident on switchbacks, minor head injury, alert and stable.',
+        'Sudden severe thunderstorm, tent collapsed, hypothermia risk.',
+        'Disoriented in backcountry canyon, low water supply.',
+        'Fall injury: dislocated shoulder, first aid applied, awaiting evac.'
+      ];
+      const sampleMed = ['Head laceration, stable', 'Shoulder dislocation', 'Dehydration', 'Minor abrasions', 'None'];
+
+      const idx = Math.floor(Math.random() * sampleHikers.length);
+      const mockEvent = {
+        messageId: 'SOS-LOCAL-' + Date.now().toString(36).toUpperCase(),
+        senderName: sampleHikers[idx],
+        message: sampleMsgs[idx],
+        lat: +(36.05 + Math.random() * 0.2).toFixed(5),
+        lon: +(-112.20 + Math.random() * 0.25).toFixed(5),
+        medicalNote: sampleMed[idx],
+        hopCount: Math.floor(Math.random() * 3) + 1,
+        ttl: 6,
+        routingStrategy: Math.random() > 0.4 ? 'IER (EDS)' : 'Epidemic',
+        receivedAt: Date.now()
+      };
+
+      const updated = [mockEvent, ...allEvents];
+      updateDashboard(updated);
+    }
+
+    document.getElementById('btn-simulate-top').addEventListener('click', triggerSimulation);
+    const simEmptyBtn = document.getElementById('btn-simulate-empty');
+    if (simEmptyBtn) simEmptyBtn.addEventListener('click', triggerSimulation);
+
+    // ─── Clear All Feed Action ───
+    document.getElementById('btn-clear-feed').addEventListener('click', async () => {
+      if (confirm('Clear all emergency incidents from view and gateway store?')) {
+        try {
+          await fetch(`${resolvedApiBase}/api/sos/clear`, { method: 'POST', mode: 'cors' });
+        } catch (_) {}
+        updateDashboard([]);
+      }
+    });
+
+    // ─── Resilient Polling Routine with Multi-Candidate Fallback ───
+    const feedStatusEl = document.getElementById('feed-status');
+    let consecutiveFailures = 0;
+
+    async function fetchEvents(isManualRetry = false) {
+      if (isManualRetry) {
+        setConnectionStatus('connecting', 'RECONNECTING...');
+      }
+
+      // Try current resolved base first, then candidates if failing
+      const attempts = [resolvedApiBase, ...CANDIDATES];
+      let success = false;
+
+      for (const base of attempts) {
+        try {
+          const res = await fetch(`${base}/api/sos-events`, { 
+            cache: 'no-store',
+            mode: 'cors'
+          });
+          if (res.ok) {
+            const data = await res.json();
+            resolvedApiBase = base;
+            consecutiveFailures = 0;
+            setConnectionStatus('online', 'GATEWAY ONLINE');
+            feedStatusEl.textContent = `Live Synced (${new Date().toLocaleTimeString()})`;
+            if (data && Array.isArray(data.events)) {
+              updateDashboard(data.events);
+            }
+            success = true;
+            break;
+          }
+        } catch (err) {
+          // Try next candidate
+        }
+      }
+
+      if (!success) {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 2) {
+          setConnectionStatus('offline', 'GATEWAY OFFLINE (RETRY)');
+          feedStatusEl.textContent = 'Gateway disconnected';
+        }
       }
     }
 
     // Initial fetch + 2.5s interval polling
     fetchEvents();
-    setInterval(fetchEvents, 2500);
+    setInterval(() => fetchEvents(false), 2500);
 
-    // ─── SSE Live Stream (Instant push fallback) ───
-    if (window.EventSource) {
-      const sse = new EventSource('/api/sos-events/stream');
-      sse.onmessage = (e) => {
-        try {
-          const msg = JSON.parse(e.data);
-          if (msg.type === 'SNAPSHOT' && Array.isArray(msg.events)) {
-            updateDashboard(msg.events);
-          } else if (msg.type === 'NEW_SOS' && msg.event) {
-            fetchEvents();
-          }
-        } catch (_) {}
-      };
+    // ─── Resilient SSE Live Stream ───
+    function initSSE() {
+      if (!window.EventSource) return;
+      try {
+        const sseUrl = `${resolvedApiBase}/api/sos-events/stream`;
+        const sse = new EventSource(sseUrl);
+
+        sse.onopen = () => {
+          setConnectionStatus('online', 'GATEWAY ONLINE (LIVE SSE)');
+          consecutiveFailures = 0;
+        };
+
+        sse.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'SNAPSHOT' && Array.isArray(msg.events)) {
+              updateDashboard(msg.events);
+            } else if (msg.type === 'NEW_SOS' && msg.event) {
+              fetchEvents();
+            }
+          } catch (_) {}
+        };
+
+        sse.onerror = () => {
+          // Re-attempt after delay; HTTP polling keeps dashboard alive
+          sse.close();
+          setTimeout(initSSE, 5000);
+        };
+      } catch (err) {
+        console.warn('SSE error:', err);
+      }
     }
+
+    initSSE();
   </script>
 </body>
 </html>
