@@ -434,10 +434,28 @@
     // Initialize Map with Dark Matter tiles
     const map = L.map('map', { zoomControl: true }).setView([36.1069, -112.1129], 6);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> | MeshRoute Rescue System',
-      maxZoom: 19
-    }).addTo(map);
+    // ─── Map Tile Configuration ───
+    // If you have an API key from carto.com/basemaps/apikey, paste it here:
+    const CARTO_API_KEY = ''; 
+
+    if (CARTO_API_KEY) {
+      // Use Carto Dark Matter with your personal API key
+      L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${CARTO_API_KEY}`, {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a> | MeshRoute Rescue System',
+        maxZoom: 19
+      }).addTo(map);
+    } else {
+      // Default: Official Esri World Dark Gray Canvas (100% Free, NO watermark, NO API key required)
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; MeshRoute Emergency Rescue',
+        maxZoom: 16
+      }).addTo(map);
+      // Dark reference overlay (boundaries, roads, place labels)
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '',
+        maxZoom: 16
+      }).addTo(map);
+    }
 
     const markerGroup = L.featureGroup().addTo(map);
     const markersMap = new Map();
