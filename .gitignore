@@ -11,3 +11,5 @@ captures
 .cxx
 *.apk
 upload_release.js
+.env
+.env.*
