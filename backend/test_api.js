@@ -10,7 +10,7 @@
 
 const http = require('http');
 const crypto = require('crypto');
-const { server } = require('./server');
+const { server, decryptedSosStore } = require('./server');
 
 const TEST_PORT = 3999;
 const PASSPHRASE = 'MeshRoute-Emergency-Broadcast-Key-2026';
@@ -118,6 +118,17 @@ async function runTests() {
     assert(res1.body.incident_id !== undefined, 'Incident ID is generated');
     const incidentId = res1.body.incident_id;
 
+    // Phase 1 Store Verification
+    const storeRecord = decryptedSosStore.find(r => r.messageId === testPacket.message_id);
+    assert(storeRecord !== undefined, 'Phase 1: SOS lands in decryptedSosStore correctly');
+    assert(storeRecord.senderName === 'Test Hiker A', 'Phase 1: storeRecord.senderName matches');
+    assert(storeRecord.message === 'Trapped in ravine, 2 injured, medical supplies urgent', 'Phase 1: storeRecord.message matches');
+    assert(storeRecord.lat === 36.1069 && storeRecord.lon === -112.1129, 'Phase 1: storeRecord coordinates match');
+    assert(storeRecord.medicalNote === 'Fractured rib', 'Phase 1: storeRecord.medicalNote matches');
+    assert(storeRecord.hopCount === 2, 'Phase 1: storeRecord.hopCount matches');
+    assert(storeRecord.ttl === 8, 'Phase 1: storeRecord.ttl matches');
+    assert(typeof storeRecord.receivedAt === 'number', 'Phase 1: storeRecord.receivedAt timestamp is valid');
+
     // -------------------------------------------------------------
     // Test 3: Duplicate Suppression (Layer 2)
     // -------------------------------------------------------------
@@ -164,6 +175,25 @@ async function runTests() {
     ]);
     const codes = [raceRes1.statusCode, raceRes2.statusCode].sort();
     assert(codes[0] === 200 && codes[1] === 201, 'One request created incident (201) and concurrent duplicate acknowledged (200)');
+
+    // -------------------------------------------------------------
+    // Test 7: Phase 2 Dashboard Data Endpoint (GET /api/sos-events)
+    // -------------------------------------------------------------
+    console.log('\n[Test 7] Phase 2: Dashboard Data Endpoint (/api/sos-events)');
+    const resEvents = await request('GET', '/api/sos-events');
+    assert(resEvents.statusCode === 200, 'GET /api/sos-events returns 200 OK');
+    assert(Array.isArray(resEvents.body.events), 'Response contains array of events');
+    assert(resEvents.body.count === resEvents.body.events.length, 'Event count matches array length');
+    assert(resEvents.body.events.length >= 2, 'Contains ingested SOS events');
+    const firstEvent = resEvents.body.events[0];
+    assert(firstEvent.messageId !== undefined, 'Event record has messageId');
+    assert(firstEvent.senderName !== undefined, 'Event record has senderName');
+    assert(firstEvent.lat !== undefined && firstEvent.lon !== undefined, 'Event record has coordinates');
+    assert(firstEvent.medicalNote !== undefined, 'Event record has medicalNote');
+    assert(firstEvent.hopCount !== undefined, 'Event record has hopCount');
+    assert(firstEvent.ttl !== undefined, 'Event record has ttl');
+    assert(firstEvent.receivedAt !== undefined, 'Event record has receivedAt');
+    assert(resEvents.body.events[0].receivedAt >= resEvents.body.events[1].receivedAt, 'Events are ordered most recent first');
 
     console.log('\n🎉 ALL PHASE 9 BACKEND TESTS PASSED!\n');
   } finally {

@@ -41,6 +41,11 @@ const EMERGENCY_KEY = crypto.createHash('sha256').update(EMERGENCY_PASSPHRASE).d
 const incidents = new Map();
 const incidentLog = [];
 
+// Phase 1: In-memory store holding decrypted SOS records (capped at 500)
+const MAX_SOS_STORE_SIZE = 500;
+const decryptedSosStore = [];
+const sseClients = new Set();
+
 /**
  * Decrypts AES-256-GCM emergency payload
  * Format: Base64 of [12-byte IV + ciphertext + 16-byte GCM authentication tag]
@@ -148,6 +153,32 @@ const server = http.createServer((req, res) => {
     });
   }
 
+  // Phase 2: GET /api/sos-events - In-memory store (most recent first, JSON array)
+  if (req.method === 'GET' && url.pathname === '/api/sos-events') {
+    return sendJson(res, 200, {
+      count: decryptedSosStore.length,
+      events: decryptedSosStore
+    });
+  }
+
+  // Phase 2: GET /api/sos-events/stream - Server-Sent Events (SSE) live push stream
+  if (req.method === 'GET' && url.pathname === '/api/sos-events/stream') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*'
+    });
+    // Send initial snapshot on connect
+    res.write(`data: ${JSON.stringify({ type: 'SNAPSHOT', count: decryptedSosStore.length, events: decryptedSosStore })}\n\n`);
+    sseClients.add(res);
+
+    req.on('close', () => {
+      sseClients.delete(res);
+    });
+    return;
+  }
+
   // POST /api/sos
   if (req.method === 'POST' && url.pathname === '/api/sos') {
     let body = '';
@@ -211,6 +242,38 @@ const server = http.createServer((req, res) => {
       incidents.set(messageId, incidentRecord);
       incidentLog.unshift(incidentRecord);
 
+      // Phase 1: Push decrypted record to in-memory store for dashboard & responder alerts
+      const lat = packet.location ? packet.location.latitude : null;
+      const lon = packet.location ? packet.location.longitude : null;
+      const decryptedData = decryptResult.data || {};
+
+      const sosStoreRecord = {
+        messageId: packet.message_id,
+        senderName: decryptedData.sender_name || 'Unknown Hiker',
+        message: decryptedData.message || '',
+        lat: lat,
+        lon: lon,
+        medicalNote: decryptedData.medical_info || '',
+        hopCount: packet.hops,
+        ttl: packet.ttl,
+        routingStrategy: packet.routing_strategy || (packet.hops > 1 ? 'IER (EDS)' : 'Epidemic'),
+        receivedAt: incidentRecord.received_at
+      };
+
+      decryptedSosStore.unshift(sosStoreRecord);
+      if (decryptedSosStore.length > MAX_SOS_STORE_SIZE) {
+        decryptedSosStore.pop();
+      }
+
+      // Broadcast to active SSE dashboard clients
+      for (const client of sseClients) {
+        try {
+          client.write(`data: ${JSON.stringify({ type: 'NEW_SOS', event: sosStoreRecord })}\n\n`);
+        } catch (_) {
+          sseClients.delete(client);
+        }
+      }
+
       // 4. Trigger Emergency Notification (console log / emergency dispatch)
       dispatchEmergencyNotification(incidentRecord, decryptResult.data);
 
@@ -224,6 +287,15 @@ const server = http.createServer((req, res) => {
       });
     });
     return;
+  }
+
+  // Phase 3 & 4: Live SOS Dashboard Frontend (Leaflet Map + Admin Feed)
+  if (req.method === 'GET' && (url.pathname === '/dashboard' || url.pathname === '/dashboard.html')) {
+    const dashPath = path.join(__dirname, 'public', 'dashboard.html');
+    if (fs.existsSync(dashPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return fs.createReadStream(dashPath).pipe(res);
+    }
   }
 
   // Static File Serving (Landing Page & Assets)
@@ -250,10 +322,11 @@ if (require.main === module) {
     console.log(`====================================================`);
     console.log(`🚀 MeshRoute Backend running on port ${PORT} (0.0.0.0)`);
     console.log(`   Local Check : http://localhost:${PORT}/health`);
+    console.log(`   Dashboard   : http://localhost:${PORT}/dashboard`);
     console.log(`   Phone Endpoint: http://10.173.133.62:${PORT}/api/sos`);
     console.log(`   AES-256-GCM emergency key active for authorized decryption`);
     console.log(`====================================================\n`);
   });
 }
 
-module.exports = { server, incidents, decryptPayload };
+module.exports = { server, incidents, incidentLog, decryptedSosStore, decryptPayload };

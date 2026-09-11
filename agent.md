@@ -15,7 +15,7 @@ $$\text{SOS Originator} \xrightarrow{\text{BLE Mesh}} \text{Relay Phone(s)} \xri
 ### Fundamental Principles & Invariants
 1. **Not a Chat App:** MeshRoute is strictly an emergency SOS dispatch pipeline. It does **not** support user profiles, avatars, media sharing, chat bubbles, or social features. Every byte of battery and radio bandwidth is dedicated to guaranteed packet propagation.
 2. **Dynamic Roles:** Any device can simultaneously be a **Sender (Originator)**, a **Relay Node (Store-Carry-Forward)**, or a **Gateway (Egress)**. A gateway is simply *any phone that currently holds active internet connectivity* (cellular/Wi-Fi).
-3. **Zero-Knowledge Ciphertext Relays:** Relays only inspect the routing envelope (`message_id`, `ttl`, `hops`, `priority`). The emergency details (sender name, medical conditions, message body) are encrypted end-to-end via AES-256-GCM. Relays never possess the plaintext.
+3. **Relay-Blind Encryption:** Relays only inspect the routing envelope (`message_id`, `ttl`, `hops`, `priority`). The emergency details (sender name, medical conditions, message body) are encrypted end-to-end via AES-256-GCM. Decryption happens only at the gateway/backend — that's the trust boundary, not zero-knowledge end-to-end. Relays never possess the plaintext.
 4. **Dual Routing Architecture (Baseline vs. IER):** 
    - **Baseline:** Epidemic Flooding (opportunistic broadcast to all visible peers).
    - **Innovation:** MeshRoute Intelligent Emergency Routing (IER) with Emergency Delivery Score (EDS) to selectively forward to high-probability carriers while reducing redundant transmissions by $> 50\%$.

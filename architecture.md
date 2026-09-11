@@ -355,5 +355,16 @@ MeshLink   → SOS + Android architecture + UI reference
                MeshRoute (own product)
 ```
 
-See `rules.md` §5 for the rules governing how these references may and may
-not be used.
+See `rules.md` §5 for the rules governing how these references were consulted.
+
+---
+
+## 10. Known Limitations & Future Work
+
+The following architectural constraints are acknowledged as deliberate MVP trade-offs and prioritized for production hardening:
+
+1. **OEM Background-Kill Risk:** Aggressive proprietary battery managers (Samsung OneUI, Xiaomi MIUI, OnePlus OxygenOS) may terminate background BLE scans/advertisements. Mitigated for MVP via `MeshForegroundService` (`connectedDevice` type with sticky persistent notification) and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`; full OEM-specific whitelist guidance is future work.
+2. **Unauthenticated Telemetry Beacons:** Local neighbor discovery beacons currently exchange unauthenticated battery, mobility, and link metrics. Sybil and blackhole attack mitigation via cryptographic beacon signatures is slated for Phase 2.
+3. **Single Backend Instance (No HA):** The emergency ingestion gateway runs on a single Node.js runtime. Sufficient for demonstration and hackathon validation; multi-region geo-distributed clustering with load-balanced egress is planned for production.
+4. **EDS Factor Calibration:** Emergency Delivery Score weights ($w_b = 0.35, w_m = 0.30, w_l = 0.15, w_p = 0.20$) are empirically assigned based on DTN simulation baselines. Formal weight calibration, ablation studies, and ML-driven parameter optimization are reserved for future research.
+5. **Relay Data Retention & Storage Security:** Store-and-forward SQLite database drops records upon TTL expiration, but lacks hardware-backed at-rest database encryption on intermediate relay phones. Flagged as a known gap for Android Keystore integration in mature releases.
