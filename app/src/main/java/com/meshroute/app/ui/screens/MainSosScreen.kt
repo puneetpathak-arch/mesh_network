@@ -66,9 +66,9 @@ fun MainSosScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    // Root container with wallpaper background + dark alpine vignette overlay
+    // Root container with wallpaper background + lighter, airy alpine glassmorphic scheme
     Box(modifier = modifier.fillMaxSize()) {
-        // ─── 1. Nocturnal Mountain Wallpaper ───
+        // ─── 1. Mountain Wallpaper (Lighter, crystal visibility) ───
         Image(
             painter = painterResource(id = R.drawable.bg_mountains),
             contentDescription = null,
@@ -76,16 +76,16 @@ fun MainSosScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Dark atmospheric vignette & gradient scrim for high contrast readability
+        // Soft, lighter alpine gradient scrim: mountain ridges and sky remain clearly visible
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xDD040A14), // Dark alpine navy at status bar
-                            Color(0xB3061020), // Subtle mist window in center
-                            Color(0xF502060C)  // Deep midnight black at bottom
+                            Color(0x4D0B1C38), // Soft twilight tint at top
+                            Color(0x260E2447), // Very airy mist window where mountain ridges shine through
+                            Color(0x5908152B)  // Gentle nocturnal base
                         )
                     )
                 )
@@ -95,7 +95,7 @@ fun MainSosScreen(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                // Responsive top bar with glassmorphism styling
+                // Frosted glass top app bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -114,81 +114,86 @@ fun MainSosScreen(
                         Column {
                             Text(
                                 text = "MeshRoute",
-                                fontWeight = FontWeight.ExtraBold,
+                                fontWeight = FontWeight.Black,
                                 fontSize = 18.sp,
                                 color = Color.White,
                                 maxLines = 1,
-                                letterSpacing = 0.3.sp
+                                letterSpacing = 0.4.sp
                             )
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
-                                // Pulsing green online dot
                                 Box(
                                     modifier = Modifier
                                         .size(6.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF00E676))
+                                        .background(Color(0xFF00FF9D))
                                 )
                                 Text(
                                     text = selfNodeId.ifBlank { "MR-763F57" },
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFFA0B3D6),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFD6E6FF),
                                     maxLines = 1
                                 )
                             }
                         }
                     }
 
-                    // Right: Gateway Connected Pill Badge + Info Button
+                    // Right: Gateway Connected Glass Pill Badge + Info Button
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        // Glassmorphic status pill
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = Color(0xCC042226),
-                            border = BorderStroke(1.dp, Color(0x5500E5BE))
+                            color = Color(0x38004D40),
+                            border = BorderStroke(
+                                1.dp,
+                                Brush.horizontalGradient(
+                                    listOf(Color(0x8000FFD1), Color(0x4000B4D8))
+                                )
+                            )
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Wifi,
                                     contentDescription = null,
-                                    tint = Color(0xFF00E5BE),
+                                    tint = Color(0xFF00FFD1),
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Text(
                                     text = if (isInternetAvailable) "Gateway Connected" else if (peerCount > 0) "Mesh Active" else "Gateway Connected",
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF00E5BE),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF00FFD1),
                                     maxLines = 1
                                 )
                             }
                         }
 
-                        // Frosted circular info icon button with generous touch target
+                        // Frosted circular info icon button with specular rim
                         IconButton(
                             onClick = onNavigateToNetworkDetails,
                             modifier = Modifier.size(38.dp)
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color(0x3310243E),
-                                border = BorderStroke(1.dp, Color(0x3338BDF8)),
-                                modifier = Modifier.size(30.dp)
+                                color = Color(0x33FFFFFF),
+                                border = BorderStroke(1.dp, Color(0x66FFFFFF)),
+                                modifier = Modifier.size(32.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Outlined.Info,
                                         contentDescription = "Network Details",
-                                        tint = Color(0xFF8DA4C4),
+                                        tint = Color.White,
                                         modifier = Modifier.size(17.dp)
                                     )
                                 }
@@ -218,45 +223,45 @@ fun MainSosScreen(
                         .padding(horizontal = 14.dp, vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // ─── Hero Glassmorphic Emergency Card ─────────────────────
+                    // ─── Hero Glassmorphic Card (Translucent, Specular Rim Light) ─────
                     Card(
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xE0061224) // Deep translucent alpine navy
+                            containerColor = Color(0x380D2447) // Translucent alpine cobalt glass
                         ),
                         border = BorderStroke(
-                            1.dp,
+                            1.2.dp,
                             Brush.verticalGradient(
                                 listOf(
-                                    Color(0x6638BDF8), // Subtle cyan moonlight rim
-                                    Color(0x261E3A5F),
-                                    Color(0x140F243E)
+                                    Color(0x99FFFFFF), // Bright crystal specular highlight on top edge
+                                    Color(0x447DD3FC), // Translucent cyan midtone
+                                    Color(0x18FFFFFF)  // Subtle bottom fade
                                 )
                             )
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .shadow(
-                                elevation = 16.dp,
-                                shape = RoundedCornerShape(22.dp),
-                                spotColor = Color(0x66000000),
-                                ambientColor = Color(0x3300D4AA)
+                                elevation = 20.dp,
+                                shape = RoundedCornerShape(24.dp),
+                                spotColor = Color(0x55000000),
+                                ambientColor = Color(0x3338BDF8)
                             )
                     ) {
                         Box(modifier = Modifier.fillMaxWidth()) {
-                            // Mountain silhouette header backdrop
+                            // Mountain header overlay with soft mist
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(110.dp)
-                                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                                    .height(115.dp)
+                                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                             ) {
                                 Image(
                                     painter = painterResource(id = R.drawable.bg_mountains),
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize(),
-                                    alpha = 0.38f
+                                    alpha = 0.50f
                                 )
                                 Box(
                                     modifier = Modifier
@@ -264,8 +269,8 @@ fun MainSosScreen(
                                         .background(
                                             Brush.verticalGradient(
                                                 listOf(
-                                                    Color(0x22061224),
-                                                    Color(0xE0061224)
+                                                    Color(0x1A0D2447),
+                                                    Color(0x800D2447)
                                                 )
                                             )
                                         )
@@ -298,12 +303,12 @@ fun MainSosScreen(
                                             text = "Broadcast an encrypted emergency message",
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF7DD3FC)
+                                            color = Color(0xFFBAE6FD)
                                         )
                                     }
                                 }
 
-                                // ─── Message Input Card ───
+                                // ─── Message Input Card (Frosted Glass Container) ───
                                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -318,7 +323,7 @@ fun MainSosScreen(
                                         Text(
                                             text = "Message",
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
+                                            fontWeight = FontWeight.Bold,
                                             color = Color(0xFF38BDF8)
                                         )
                                     }
@@ -326,9 +331,14 @@ fun MainSosScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(Color(0xCC040B16), RoundedCornerShape(12.dp))
+                                            .background(Color(0x35081830), RoundedCornerShape(12.dp))
                                             .border(
-                                                BorderStroke(1.dp, Color(0x3338BDF8)),
+                                                BorderStroke(
+                                                    1.dp,
+                                                    Brush.verticalGradient(
+                                                        listOf(Color(0x66FFFFFF), Color(0x2238BDF8))
+                                                    )
+                                                ),
                                                 RoundedCornerShape(12.dp)
                                             )
                                             .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -340,7 +350,7 @@ fun MainSosScreen(
                                                     if (it.length <= 200) onMessageChange(it)
                                                 },
                                                 textStyle = TextStyle(
-                                                    color = Color(0xFFF1F5F9),
+                                                    color = Color.White,
                                                     fontSize = 13.5.sp,
                                                     lineHeight = 19.sp,
                                                     fontWeight = FontWeight.Normal
@@ -352,7 +362,7 @@ fun MainSosScreen(
                                                     if (sosMessageText.isEmpty()) {
                                                         Text(
                                                             text = "Describe emergency situation...",
-                                                            color = Color(0xFF475E7E),
+                                                            color = Color(0xFF90A4C4),
                                                             fontSize = 13.5.sp
                                                         )
                                                     }
@@ -365,15 +375,15 @@ fun MainSosScreen(
                                             Text(
                                                 text = "${sosMessageText.length}/200",
                                                 fontSize = 10.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = Color(0xFF7087A5),
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFFA0B8D8),
                                                 modifier = Modifier.align(Alignment.End)
                                             )
                                         }
                                     }
                                 }
 
-                                // ─── Sender Name & Medical / Notes Row ───
+                                // ─── Sender Name & Medical / Notes Row (Frosted Glass) ───
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -396,7 +406,7 @@ fun MainSosScreen(
                                             Text(
                                                 text = "Sender Name",
                                                 fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
+                                                fontWeight = FontWeight.Bold,
                                                 color = Color(0xFF38BDF8)
                                             )
                                         }
@@ -405,9 +415,14 @@ fun MainSosScreen(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(42.dp)
-                                                .background(Color(0xCC040B16), RoundedCornerShape(10.dp))
+                                                .background(Color(0x35081830), RoundedCornerShape(10.dp))
                                                 .border(
-                                                    BorderStroke(1.dp, Color(0x3338BDF8)),
+                                                    BorderStroke(
+                                                        1.dp,
+                                                        Brush.verticalGradient(
+                                                            listOf(Color(0x55FFFFFF), Color(0x2238BDF8))
+                                                        )
+                                                    ),
                                                     RoundedCornerShape(10.dp)
                                                 )
                                                 .padding(horizontal = 11.dp),
@@ -418,7 +433,7 @@ fun MainSosScreen(
                                                 onValueChange = onSenderNameChange,
                                                 singleLine = true,
                                                 textStyle = TextStyle(
-                                                    color = Color(0xFFF1F5F9),
+                                                    color = Color.White,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Normal
                                                 ),
@@ -427,7 +442,7 @@ fun MainSosScreen(
                                                     if (senderName.isEmpty()) {
                                                         Text(
                                                             text = "Your name",
-                                                            color = Color(0xFF475E7E),
+                                                            color = Color(0xFF90A4C4),
                                                             fontSize = 12.5.sp
                                                         )
                                                     }
@@ -455,7 +470,7 @@ fun MainSosScreen(
                                             Text(
                                                 text = "Medical / Notes",
                                                 fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
+                                                fontWeight = FontWeight.Bold,
                                                 color = Color(0xFF38BDF8),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -466,9 +481,14 @@ fun MainSosScreen(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(42.dp)
-                                                .background(Color(0xCC040B16), RoundedCornerShape(10.dp))
+                                                .background(Color(0x35081830), RoundedCornerShape(10.dp))
                                                 .border(
-                                                    BorderStroke(1.dp, Color(0x3338BDF8)),
+                                                    BorderStroke(
+                                                        1.dp,
+                                                        Brush.verticalGradient(
+                                                            listOf(Color(0x55FFFFFF), Color(0x2238BDF8))
+                                                        )
+                                                    ),
                                                     RoundedCornerShape(10.dp)
                                                 )
                                                 .padding(horizontal = 11.dp),
@@ -479,7 +499,7 @@ fun MainSosScreen(
                                                 onValueChange = onMedicalNotesChange,
                                                 singleLine = true,
                                                 textStyle = TextStyle(
-                                                    color = Color(0xFFF1F5F9),
+                                                    color = Color.White,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Normal
                                                 ),
@@ -488,7 +508,7 @@ fun MainSosScreen(
                                                     if (medicalNotes.isEmpty()) {
                                                         Text(
                                                             text = "Medical notes",
-                                                            color = Color(0xFF475E7E),
+                                                            color = Color(0xFF90A4C4),
                                                             fontSize = 12.5.sp
                                                         )
                                                     }
@@ -499,7 +519,7 @@ fun MainSosScreen(
                                     }
                                 }
 
-                                // ─── Location Section ───
+                                // ─── Location Section (Frosted Glass) ───
                                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -514,15 +534,20 @@ fun MainSosScreen(
                                         Text(
                                             text = "Location",
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
+                                            fontWeight = FontWeight.Bold,
                                             color = Color(0xFF38BDF8)
                                         )
                                     }
 
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
-                                        color = Color(0xCC040B16),
-                                        border = BorderStroke(1.dp, Color(0x3338BDF8)),
+                                        color = Color(0x35081830),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            Brush.verticalGradient(
+                                                listOf(Color(0x55FFFFFF), Color(0x2238BDF8))
+                                            )
+                                        ),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
@@ -537,7 +562,7 @@ fun MainSosScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                 modifier = Modifier.weight(1f)
                                             ) {
-                                                // Pulsing Radar Dot
+                                                // Luminous Radar Dot
                                                 Box(
                                                     modifier = Modifier.size(16.dp),
                                                     contentAlignment = Alignment.Center
@@ -546,13 +571,13 @@ fun MainSosScreen(
                                                         modifier = Modifier
                                                             .size(16.dp)
                                                             .clip(CircleShape)
-                                                            .background(Color(0x3300E676))
+                                                            .background(Color(0x4400FF9D))
                                                     )
                                                     Box(
                                                         modifier = Modifier
                                                             .size(8.dp)
                                                             .clip(CircleShape)
-                                                            .background(Color(0xFF00E676))
+                                                            .background(Color(0xFF00FF9D))
                                                     )
                                                 }
 
@@ -561,7 +586,7 @@ fun MainSosScreen(
                                                         text = "Location ready",
                                                         fontSize = 12.5.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF00E676)
+                                                        color = Color(0xFF00FF9D)
                                                     )
                                                     Text(
                                                         text = if (currentLocation != null) {
@@ -574,17 +599,17 @@ fun MainSosScreen(
                                                             "26.7303, 83.4387  (Accuracy ±1m)"
                                                         },
                                                         fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Normal,
-                                                        color = Color(0xFFA0B3D6)
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = Color(0xFFD6E6FF)
                                                     )
                                                 }
                                             }
 
-                                            // Crosshair target button with frosted circle
+                                            // Crosshair target button with crystal glass circle
                                             Surface(
                                                 shape = CircleShape,
-                                                color = Color(0x3310243E),
-                                                border = BorderStroke(1.dp, Color(0x3338BDF8)),
+                                                color = Color(0x33FFFFFF),
+                                                border = BorderStroke(1.dp, Color(0x66FFFFFF)),
                                                 modifier = Modifier
                                                     .size(32.dp)
                                                     .clickable { onRefreshLocation() }
@@ -610,7 +635,7 @@ fun MainSosScreen(
                                     }
                                 }
 
-                                // ─── Relay Distance Section ───
+                                // ─── Relay Distance Section (Frosted Glass) ───
                                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -631,12 +656,12 @@ fun MainSosScreen(
                                                 text = "relay distance",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Medium,
-                                                color = Color(0xFF7DD3FC)
+                                                color = Color(0xFFBAE6FD)
                                             )
                                             Icon(
                                                 imageVector = Icons.Outlined.Info,
                                                 contentDescription = null,
-                                                tint = Color(0xFF7087A5),
+                                                tint = Color(0xFF90A4C4),
                                                 modifier = Modifier.size(13.dp)
                                             )
                                         }
@@ -648,19 +673,19 @@ fun MainSosScreen(
                                             Icon(
                                                 imageVector = Icons.Default.Star,
                                                 contentDescription = null,
-                                                tint = Color(0xFF00E5BE),
+                                                tint = Color(0xFF00FFD1),
                                                 modifier = Modifier.size(12.dp)
                                             )
                                             Text(
                                                 text = "Recommended",
                                                 fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color(0xFF00E5BE)
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF00FFD1)
                                             )
                                         }
                                     }
 
-                                    // 4 Hops Buttons
+                                    // 4 Hops Buttons with Frosted Crystal Glass
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -669,14 +694,19 @@ fun MainSosScreen(
                                             val isSelected = selectedReachHops == hops
                                             Surface(
                                                 shape = RoundedCornerShape(10.dp),
-                                                color = if (isSelected) Color(0xEE03363B) else Color(0x99040B16),
+                                                color = if (isSelected) Color(0x6600554E) else Color(0x2E081830),
                                                 border = BorderStroke(
                                                     width = if (isSelected) 1.5.dp else 1.dp,
-                                                    color = if (isSelected) Color(0xFF00E5BE) else Color(0x2B38BDF8)
+                                                    color = if (isSelected) Color(0xFF00FFD1) else Color(0x38FFFFFF)
                                                 ),
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .height(36.dp)
+                                                    .shadow(
+                                                        elevation = if (isSelected) 8.dp else 0.dp,
+                                                        shape = RoundedCornerShape(10.dp),
+                                                        spotColor = Color(0xFF00FFD1)
+                                                    )
                                                     .clickable { onReachHopsChange(hops) }
                                             ) {
                                                 Row(
@@ -688,14 +718,14 @@ fun MainSosScreen(
                                                         text = "$hops Hops",
                                                         fontSize = 11.sp,
                                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                        color = if (isSelected) Color.White else Color(0xFFA0B3D6)
+                                                        color = if (isSelected) Color.White else Color(0xFFD6E6FF)
                                                     )
                                                     if (isSelected) {
                                                         Spacer(modifier = Modifier.width(3.dp))
                                                         Icon(
                                                             imageVector = Icons.Default.CheckCircle,
                                                             contentDescription = "Selected",
-                                                            tint = Color(0xFF00E5BE),
+                                                            tint = Color(0xFF00FFD1),
                                                             modifier = Modifier.size(13.dp)
                                                         )
                                                     }
@@ -707,23 +737,23 @@ fun MainSosScreen(
 
                                 Spacer(modifier = Modifier.height(2.dp))
 
-                                // ─── SEND SOS Primary Button ───
+                                // ─── SEND SOS Primary Button (Vibrant Radiant Glow) ───
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(sendButtonHeight)
                                         .shadow(
-                                            elevation = 14.dp,
+                                            elevation = 16.dp,
                                             shape = RoundedCornerShape(16.dp),
-                                            spotColor = Color(0xFFFF2A4D),
-                                            ambientColor = Color(0xFFFF2A4D)
+                                            spotColor = Color(0xFFFF2E54),
+                                            ambientColor = Color(0xFFFF2E54)
                                         )
                                         .background(
                                             Brush.horizontalGradient(
                                                 listOf(
-                                                    Color(0xFFFF2A4D),
-                                                    Color(0xFFFF3D65),
-                                                    Color(0xFFFF4D2B)
+                                                    Color(0xFFFF2E54),
+                                                    Color(0xFFFF486E),
+                                                    Color(0xFFFF5E36)
                                                 )
                                             ),
                                             shape = RoundedCornerShape(16.dp)
@@ -782,7 +812,7 @@ fun MainSosScreen(
                                                     text = "Broadcast encrypted emergency message",
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Medium,
-                                                    color = Color.White.copy(alpha = 0.88f),
+                                                    color = Color.White.copy(alpha = 0.92f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -819,7 +849,7 @@ private fun MeshRouteHeaderLogo(modifier: Modifier = Modifier) {
 
         // Outer subtle cyan glow ring
         drawCircle(
-            color = Color(0x3300E5BE),
+            color = Color(0x4D00FFD1),
             radius = maxR,
             center = center,
             style = Stroke(width = 1.5.dp.toPx())
@@ -828,7 +858,7 @@ private fun MeshRouteHeaderLogo(modifier: Modifier = Modifier) {
         // Middle ring with nodes
         val midR = maxR * 0.72f
         drawCircle(
-            color = Color(0x6600E5BE),
+            color = Color(0x8000FFD1),
             radius = midR,
             center = center,
             style = Stroke(width = 1.2.dp.toPx())
@@ -837,7 +867,7 @@ private fun MeshRouteHeaderLogo(modifier: Modifier = Modifier) {
         // Inner glowing core
         drawCircle(
             brush = Brush.radialGradient(
-                listOf(Color(0xFF00E5BE), Color(0xFF00897B), Color.Transparent),
+                listOf(Color(0xFF00FFD1), Color(0xFF009688), Color.Transparent),
                 center = center,
                 radius = maxR * 0.45f
             ),
@@ -852,7 +882,7 @@ private fun MeshRouteHeaderLogo(modifier: Modifier = Modifier) {
             val dx = center.x + (midR * kotlin.math.cos(angle)).toFloat()
             val dy = center.y + (midR * kotlin.math.sin(angle)).toFloat()
             drawCircle(
-                color = Color(0xFF00E5BE),
+                color = Color(0xFF00FFD1),
                 radius = 1.8.dp.toPx(),
                 center = Offset(dx, dy)
             )
@@ -871,8 +901,8 @@ private fun EmergencySirenBadge(modifier: Modifier = Modifier) {
             .background(
                 Brush.radialGradient(
                     listOf(
-                        Color(0x66FF2A4D),
-                        Color(0x22FF2A4D),
+                        Color(0x66FF2E54),
+                        Color(0x22FF2E54),
                         Color.Transparent
                     )
                 )
@@ -887,11 +917,11 @@ private fun EmergencySirenBadge(modifier: Modifier = Modifier) {
                     Brush.verticalGradient(
                         listOf(
                             Color(0xFFFF385C),
-                            Color(0xFFCC1133)
+                            Color(0xFFD6183C)
                         )
                     )
                 )
-                .border(1.dp, Color(0xFFFF6680), CircleShape),
+                .border(1.dp, Color(0xFFFF8599), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.size(24.dp)) {
@@ -929,7 +959,7 @@ private fun EmergencySirenBadge(modifier: Modifier = Modifier) {
                     val x2 = cx + ((startR + rayLength) * kotlin.math.cos(rad)).toFloat()
                     val y2 = cy + ((startR + rayLength) * kotlin.math.sin(rad)).toFloat()
                     drawLine(
-                        color = Color.White.copy(alpha = 0.9f),
+                        color = Color.White.copy(alpha = 0.95f),
                         start = Offset(x1, y1),
                         end = Offset(x2, y2),
                         strokeWidth = 1.5.dp.toPx(),
